@@ -69,7 +69,7 @@ def main():
     # load database of granules
     # TODO: turn this into a proper database
     # using a csv file as a temp measure
-    granules = pd.read_csv("l8-granules.csv")
+    granules = pd.read_csv("s2-granules.csv")
     granules['date'] = pd.to_datetime(granules['date'])
     granules = granules.sort_values(by="date", ascending=False)
     
