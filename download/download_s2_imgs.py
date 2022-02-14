@@ -9,7 +9,9 @@ import boto3
 from sentinelhub import SHConfig, WebFeatureService, DataCollection, Geometry, AwsTileRequest, AwsTile
 
 
-DATA_COLLECTION = DataCollection.SENTINEL2_L2A
+DATA_COLLECTION = DataCollection.SENTINEL2_L2A # use only L2A scenes
+QUEUE = "S2ImgsToBeProcessed" # name of sqs queue to send messages to for processing
+REGION = "us-west-2" # aws region of queue
 
 
 """ Authenticate the user based on the credentials in their config.json file.
@@ -87,6 +89,7 @@ def copy_to_s3(tile_list, dst_bucket, files):
         (?:/\d+)
         """, re.VERBOSE)
     
+    copied_tiles = []
     for tile in tile_list:
         id = tile[0] # use tile id when naming output files
         path = tile[1]
@@ -94,6 +97,8 @@ def copy_to_s3(tile_list, dst_bucket, files):
         # pad month and day with a zero if necessary
         month = pad_zeroes(m.group('month'))
         day = pad_zeroes(m.group('day'))
+        tile_prefix = (f"sentinel-2/{m.group('utm')}/{m.group('lat')}/{m.group('square')}/"
+                        f"{m.group('year')}/{month}/{day}/{id}")
         for file in files:
             # split bucket name from key
             copy_key = f"{path[21:]}/{file}"
@@ -103,10 +108,11 @@ def copy_to_s3(tile_list, dst_bucket, files):
             }
             # construct the appropriate key, removing the /tiles/ prefix and stripping any folders from the
             # individual files (ex. R10m/B04.jp2 -> B04.jp2)
-            dst_key = (f"sentinel-2/{m.group('utm')}/{m.group('lat')}/{m.group('square')}/"
-                        f"{m.group('year')}/{month}/{day}/{id}_{os.path.basename(file)}")
+            dst_key = (f"{tile_prefix}_{os.path.basename(file)}")
             print(f"Copying to s3://{dst_bucket}/{dst_key}...")
             s3.meta.client.copy(copy_source, dst_bucket, dst_key, ExtraArgs={'RequestPayer': 'requester'})
+        copied_tiles.append(tile_prefix)
+    return copied_tiles
 
 
 """ Given a string, return that string padded with zeroes, if necessary.
@@ -145,6 +151,18 @@ def download(downloads, bands=['R10m/B04', 'R10m/B08'], metafiles=['tileInfo', '
     return downloaded
 
 
+def send_sqs_messages(messages):
+    print("Sending SQS messages...")
+
+    sqs = boto3.resource("sqs", region_name=REGION)
+    q = sqs.get_queue_by_name(QueueName=QUEUE)
+    
+    resp = []
+    for msg in messages:
+        resp.append(q.send_message(MessageBody = msg))
+    
+    return resp
+
 def main():
     parser = argparse.ArgumentParser(
         description="Search for and download L8 scenes that match criteria.")
@@ -171,8 +189,12 @@ def main():
     tile_list = search(config, date_range=args.date_range, boundary=args.boundary)
     # grab only desired files: R band, NIR band, metadata file, and cloud mask
     files = ['R10m/B04.jp2', 'R10m/B08.jp2', 'tileInfo.json', 'qi/MSK_CLOUDS_B00.gml']
-    copy_to_s3(tile_list, args.dst, files)
+    copied_tiles = copy_to_s3(tile_list, args.dst, files)
 
+    # send sqs messages to trigger lambda processing function
+    # message body is each prefix of each tile
+    resp = send_sqs_messages(copied_tiles)
+    
     print("Done.")
 
     # downloaded = download(downloads)
