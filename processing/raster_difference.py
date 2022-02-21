@@ -7,6 +7,8 @@ import numpy as np
 from pandas.tseries.offsets import DateOffset
 from osgeo import gdal
 
+from processing_utils import arr_to_gtiff
+
 
 """ Given a row in a DataFrame representing a granule, return the full filename
     of that granule in the s3 filesystem so GDAL can access it. """
@@ -46,6 +48,8 @@ def main():
                         help="first date (format: yyyy-mm-dd)")
     parser.add_argument("end", type=str,
                         help="second date (format: yyyy-mm-dd, should be later than start)")
+    parser.add_argument("ds", type=str, choices=['l8', 's2'],
+                        help="dataset to calculate difference for (currently supported: landsat-8 and sentinel-2)")
     parser.add_argument("-years", "--y", dest="years", type=int, default=0,
                         help="how many years to look back to fill in missing data")
     parser.add_argument("-months", "--m", dest="months", type=int, default=0,
@@ -64,7 +68,6 @@ def main():
     if end_d <= start:
         end_d = start
 
-    # TODO: verbosity
     print("Searching for granules...")
     # load database of granules
     # TODO: turn this into a proper database
@@ -78,45 +81,29 @@ def main():
 
     # build a combined vrt with the start and end rasters. this will automatically handle differences in bounds
     print("Building combined VRT from TIF images...")
-    combined_vrt = gdal.BuildVRT("combined.vrt", [start_tif, end_tif], separate=True)
+    combined_file = "combined.vrt"
+    combined_vrt = gdal.BuildVRT(combined_file, [start_tif, end_tif], separate=True)
     # flush cache
     combined_vrt = None
 
     # get difference between start & end
     print("Calculating difference raster...")
-    combined = gdal.Open("combined.vrt")
+    combined = gdal.Open(combined_file)
     start_band = combined.GetRasterBand(1).ReadAsArray().astype(np.float32)
     end_band = combined.GetRasterBand(2).ReadAsArray().astype(np.float32)
-    gt = combined.GetGeoTransform()
-    proj = combined.GetProjection()
-    xsize = combined.RasterXSize
-    ysize = combined.RasterYSize
-
     diff = np.subtract(end_band, start_band)
 
-    # save to raster
-    driver = gdal.GetDriverByName("GTiff")
-    driver.Register()
-    # TODO: change output name
-    out_ds = driver.Create("diff.tif",
-                           xsize = xsize,
-                           ysize = ysize,
-                           bands = 1,
-                           eType = gdal.GDT_Float32)
-    out_ds.SetGeoTransform(gt)
-    out_ds.SetProjection(proj)
-    outband = out_ds.GetRasterBand(1)
-    outband.WriteArray(diff)
-    outband.SetNoDataValue(np.nan)
-    outband.FlushCache
-
+    # save results to geotiff
+    diff_file = f"diff_{args.ds}_{args.start}_{args.end}"
+    arr_to_gtiff(diff, diff_file, combined_file)
+    
     # flush cashe
-    combined = start_band = end_band = gt = proj = driver = out_ds = outband = xsize = ysize = None
+    combined = start_band = end_band = None
 
     # remove unnecessary files
-    # os.remove(start_tif)
-    # os.remove(end_tif)
-    os.remove("combined.vrt")
+    os.remove(start_tif)
+    os.remove(end_tif)
+    os.remove(combined_file)
     print("Done.")
 
 
