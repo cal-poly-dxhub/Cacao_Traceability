@@ -68,6 +68,8 @@ def copy_to_s3(tile_list, dst_bucket, files):
         return None
 
     s3 = boto3.resource('s3')
+    sqs = boto3.resource("sqs", region_name=REGION)
+    q = sqs.get_queue_by_name(QueueName=QUEUE)
 
     # a full breakdown of the naming convention can be found here:
     # https://roda.sentinel-hub.com/sentinel-s2-l2a/readme.html
@@ -89,7 +91,6 @@ def copy_to_s3(tile_list, dst_bucket, files):
         (?:/\d+)
         """, re.VERBOSE)
     
-    copied_tiles = []
     for tile in tile_list:
         id = tile[0] # use tile id when naming output files
         path = tile[1]
@@ -111,8 +112,8 @@ def copy_to_s3(tile_list, dst_bucket, files):
             dst_key = (f"{tile_prefix}_{os.path.basename(file)}")
             print(f"Copying to s3://{dst_bucket}/{dst_key}...")
             s3.meta.client.copy(copy_source, dst_bucket, dst_key, ExtraArgs={'RequestPayer': 'requester'})
-        copied_tiles.append(tile_prefix)
-    return copied_tiles
+        # send message to queue to start processing for this tile
+        q.send_message(MessageBody = f"{dst_bucket}/{tile_prefix}")
 
 
 """ Given a string, return that string padded with zeroes, if necessary.
@@ -150,18 +151,6 @@ def download(downloads, bands=['R10m/B04', 'R10m/B08'], metafiles=['tileInfo', '
     
     return downloaded
 
-
-def send_sqs_messages(messages):
-    print("Sending SQS messages...")
-
-    sqs = boto3.resource("sqs", region_name=REGION)
-    q = sqs.get_queue_by_name(QueueName=QUEUE)
-    
-    resp = []
-    for msg in messages:
-        resp.append(q.send_message(MessageBody = msg))
-    
-    return resp
 
 def main():
     parser = argparse.ArgumentParser(
