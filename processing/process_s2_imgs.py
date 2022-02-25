@@ -5,6 +5,9 @@ from osgeo import gdal
 import numpy as np
 import boto3
 
+from processing_utils import mask_clouds_and_calc_ndvi, arr_to_gtiff
+
+
 def lambda_handler(event, context):
     prefix = event['Records'][0]['body']
     prefix = prefix.split('/', 1)
@@ -20,7 +23,8 @@ def lambda_handler(event, context):
     
     # upload generated file to s3
     dest_bucket = "processed-granules"
-    prefix = os.path.dirname(key)
+    # remove redundant folder name from uploaded file
+    prefix = os.path.dirname(os.path.dirname(key))
     key = f"{prefix}/{result}"
     s3 = boto3.client('s3')
     s3.upload_file(result, dest_bucket, key)
@@ -28,7 +32,7 @@ def lambda_handler(event, context):
     os.remove(result)
     
     
-""" Given a Landsat 8 scene, caclulate NDVI, mask clouds, and upload the result in dest_bucket. """
+""" Given a the base name of a Sentinel-2 scene, caclulate NDVI, mask clouds, and save the results as a geotiff. """
 def calc_ndvi_and_mask_s2_clouds(file):
     red_band = "B04.jp2"
     nir_band = "B08.jp2"
@@ -59,50 +63,16 @@ def calc_ndvi_and_mask_s2_clouds(file):
     cloud_mask_ds = gdal.Open("mask.tif")
     cloud_mask = cloud_mask_ds.GetRasterBand(1).ReadAsArray()
     
-    # calculate NDVI
-    # TODO: this throws a warning, but the actual file looks fine. I'm guessing
-    # it has to do with the fact that the tifs are rotated--maybe numpy is padding
-    # them with zeroes to compensate, which causes some calculations to be 0/0.
-    ndvi = np.divide(np.subtract(nir, red), np.add(nir, red))
-    ndvi = np.where(ndvi == np.inf, np.nan, ndvi)
-    
-    # mask out clouds, and delete temporary cloud mask raster after to save space
-    ndvi_masked = np.where(cloud_mask, np.nan, ndvi)
-    cloud_mask_ds = cloud_mask = None
+    ndvi_masked = calc_ndvi_and_mask_s2_clouds(red, nir, cloud_mask)
+
+    # remove temp cloud mask file to save space
+    cloud_mask_ds = None
     os.remove("mask.tif")
     
-    # get gt, projection, and size from red band
-    gt = red_ds.GetGeoTransform()
-    proj = red_ds.GetProjection()
-    xsize = red_ds.RasterXSize
-    ysize = red_ds.RasterYSize
-    
     ndvi_masked_file = f"{os.path.basename(file)}_NDVI_MASKED.TIF"
-    
-    # write mask to new file
-    driver = gdal.GetDriverByName("GTiff")
-    driver.Register()
-    out_ds = driver.Create(ndvi_masked_file,
-                          xsize = xsize,
-                          ysize = ysize,
-                          bands = 1,
-                          eType = gdal.GDT_Float32)
-    out_ds.SetGeoTransform(gt)
-    out_ds.SetProjection(proj)
-    outband = out_ds.GetRasterBand(1)
-    outband.WriteArray(ndvi_masked)
-    outband.SetNoDataValue(np.nan)
-    outband.FlushCache
+    arr_to_gtiff(ndvi_masked, ndvi_masked_file, red_band_file)
     
     # free data so it saves to disk properly
     red_ds = nir_ds = cloud_mask_ds = out_ds = outband = driver = None
     
     return ndvi_masked_file
-
-
-def main():
-    file = "/vsis3/raw-granules/sentinel-2/18/N/WM/2020/04/03/S2B_OPER_MSI_L2A_TL_MTI__20200403T211516_A016067_T18NWM_N02.14"
-    calc_ndvi_and_mask_s2_clouds(file)
-
-if __name__ == "__main__":
-    main()

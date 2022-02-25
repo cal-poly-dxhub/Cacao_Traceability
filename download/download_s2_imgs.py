@@ -31,8 +31,6 @@ def authenticate():
     be downloaded. date_range should be a tuple, cloud_max should be an int, and boundary
     should oint to a GeoJSON file. Reserving **kwargs to be used in the future if needed. """
 def search(config, dataset=None,  date_range=None, cloud_max=1, boundary=None, **kwargs):
-    print("Fetching scenes...")
-
     # convert geojson to BBox object
     if boundary:
         with open(boundary) as file:
@@ -59,15 +57,9 @@ def search(config, dataset=None,  date_range=None, cloud_max=1, boundary=None, *
 """ Given a list of tiles in the Sentinelhub S2 bucket and a list of files to copy for
     each tile, copy those files into dst_bucket. """
 def copy_to_s3(tile_list, dst_bucket, files):
-    if len(tile_list) == 0:
-        print("No tiles matching the criteria were found.")
-        return None
-
-    download = input(f"Copy {len(tile_list)} scene(s) to s3://{dst_bucket}? (Y/N) ")
-    if download.lower() not in {'y', 'yes'}:
-        return None
-
     s3 = boto3.resource('s3')
+    sqs = boto3.resource("sqs", region_name=REGION)
+    q = sqs.get_queue_by_name(QueueName=QUEUE)
 
     # a full breakdown of the naming convention can be found here:
     # https://roda.sentinel-hub.com/sentinel-s2-l2a/readme.html
@@ -86,10 +78,10 @@ def copy_to_s3(tile_list, dst_bucket, files):
         (?P<month>\d{1,2})              # match the month
         (?:/)
         (?P<day>\d{1,2})                # match the day
-        (?:/\d+)
+        (?:/)
+        (?P<sequence>\d{1})             # match the sequence, if there is more than one image per day
         """, re.VERBOSE)
     
-    copied_tiles = []
     for tile in tile_list:
         id = tile[0] # use tile id when naming output files
         path = tile[1]
@@ -98,7 +90,8 @@ def copy_to_s3(tile_list, dst_bucket, files):
         month = pad_zeroes(m.group('month'))
         day = pad_zeroes(m.group('day'))
         tile_prefix = (f"sentinel-2/{m.group('utm')}/{m.group('lat')}/{m.group('square')}/"
-                        f"{m.group('year')}/{month}/{day}/{id}")
+                        f"{m.group('year')}/{month}/{id}_{m.group('sequence')}{id}_{m.group('sequence')}/")
+        print(f"Copying to s3://{dst_bucket}/{tile_prefix}")
         for file in files:
             # split bucket name from key
             copy_key = f"{path[21:]}/{file}"
@@ -109,10 +102,9 @@ def copy_to_s3(tile_list, dst_bucket, files):
             # construct the appropriate key, removing the /tiles/ prefix and stripping any folders from the
             # individual files (ex. R10m/B04.jp2 -> B04.jp2)
             dst_key = (f"{tile_prefix}_{os.path.basename(file)}")
-            print(f"Copying to s3://{dst_bucket}/{dst_key}...")
             s3.meta.client.copy(copy_source, dst_bucket, dst_key, ExtraArgs={'RequestPayer': 'requester'})
-        copied_tiles.append(tile_prefix)
-    return copied_tiles
+        # send message to queue to start processing for this tile
+        q.send_message(MessageBody = f"{dst_bucket}/{tile_prefix}")
 
 
 """ Given a string, return that string padded with zeroes, if necessary.
@@ -151,18 +143,6 @@ def download(downloads, bands=['R10m/B04', 'R10m/B08'], metafiles=['tileInfo', '
     return downloaded
 
 
-def send_sqs_messages(messages):
-    print("Sending SQS messages...")
-
-    sqs = boto3.resource("sqs", region_name=REGION)
-    q = sqs.get_queue_by_name(QueueName=QUEUE)
-    
-    resp = []
-    for msg in messages:
-        resp.append(q.send_message(MessageBody = msg))
-    
-    return resp
-
 def main():
     parser = argparse.ArgumentParser(
         description="Search for and download L8 scenes that match criteria.")
@@ -177,8 +157,6 @@ def main():
                         help="path to geojson file with boundary of search")
     parser.add_argument("-dst", metavar="bucket", type=str,
                         help="s3 bucket to store downloaded scenes in")
-    parser.add_argument("-quiet", "--q", dest="verbose", action="store_false",
-                        help="suppress printing to the console")
     args = parser.parse_args()
 
 
@@ -186,14 +164,20 @@ def main():
     # if we can perform searching ourselves, credentials would not be necessary
     config = authenticate()
 
+    print("Fetching scenes...")
     tile_list = search(config, date_range=args.date_range, boundary=args.boundary)
     # grab only desired files: R band, NIR band, metadata file, and cloud mask
     files = ['R10m/B04.jp2', 'R10m/B08.jp2', 'tileInfo.json', 'qi/MSK_CLOUDS_B00.gml']
-    copied_tiles = copy_to_s3(tile_list, args.dst, files)
 
-    # send sqs messages to trigger lambda processing function
-    # message body is each prefix of each tile
-    resp = send_sqs_messages(copied_tiles)
+    if len(tile_list) == 0:
+        print("No tiles matching the criteria were found.")
+        return None
+    
+    download = input(f"Copy {len(tile_list)} scene(s) to s3://{args.dst}? (Y/N) ")
+    if download.lower() not in {'y', 'yes'}:
+        return None
+
+    copy_to_s3(tile_list, args.dst, files)
     
     print("Done.")
 
