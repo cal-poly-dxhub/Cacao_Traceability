@@ -23,7 +23,8 @@ def lambda_handler(event, context):
     
     # upload generated file to s3
     dest_bucket = "processed-granules"
-    prefix = os.path.dirname(key)
+    # remove redundant folder name from uploaded file
+    prefix = os.path.dirname(os.path.dirname(key))
     key = f"{prefix}/{result}"
     s3 = boto3.client('s3')
     s3.upload_file(result, dest_bucket, key)
