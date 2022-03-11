@@ -1,0 +1,31 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  cacao-chatbot
+
+  Sample SAM Template for cacao-chatbot
+
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 10
+
+Resources:
+  PinpointSNSHandler:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: PinpointSNSHandler/
+      Handler: lambda_handler.lambda_handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64
+      Role: arn:aws:iam::285396213403:role/service-role/LexPinpointDemo-role-ul3j7mwn
+
+Outputs:
+  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
+  # Find out more about other implicit resources you can reference within SAM
+  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
+  PinpointSNSHandler:
+    Description: "Function the responds to SNS Trigger Function ARN"
+    Value: !GetAtt PinpointSNSHandler.Arn
+
