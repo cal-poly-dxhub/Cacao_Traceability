@@ -20,6 +20,15 @@ Resources:
       Architectures:
         - x86_64
       Role: arn:aws:iam::285396213403:role/service-role/LexPinpointDemo-role-ul3j7mwn
+  LexFulfillmentHandler:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: LexFulfillmentHandler/
+      Handler: lambda_handler.lambda_handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64
+      Role: arn:aws:iam::285396213403:role/service-role/LexPinpointDemo-role-ul3j7mwn
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
