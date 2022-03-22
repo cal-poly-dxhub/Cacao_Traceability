@@ -1,5 +1,10 @@
 import os
 import logging
+import pyqldb
+import pymysql
+from pyqldb.driver.qldb_driver import QldbDriver
+
+qldb_driver = QldbDriver(ledger_name='cacao-ledger-test')
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -47,19 +52,72 @@ def close(intent_request, session_attributes, fulfillment_state, message):
         'sessionId': intent_request['sessionId'],
         'requestAttributes': intent_request['requestAttributes'] if 'requestAttributes' in intent_request else None
     }
+def findFarmersBuckets(transaction_executor, farmerID):
+    cursor = transaction_executor.execute_statement("SELECT * FROM transactions WHERE farmerId = ?", farmerID)
+    count = 0
+    for bucket in cursor:
+        print (bucket)
+        count = count + 1        
+    return count
 
 def ReviewLastPickupDetails(intent_request):
     session_attributes = get_session_attributes(intent_request)
     slots = get_slots(intent_request)
-    genre = get_slot(intent_request, 'genre')
-
-    text = "Thank you. Your records are"
+    
+    count = qldb_driver.execute_lambda(lambda executor: findFarmersBuckets(executor, "d2066964-a2b3-4ab8-9783-f4f40bdc3b3e"))
+    text = ""
+    if count == 0:
+        text = "There where no recorded pickups today."
+    elif count == 1:
+         text = "We recorded " + str(count) + " bucket picked up today.  Thanks for your business."
+    else:
+        text = "We recorded " + str(count) + " buckets picked up today.  Thanks for your business."
     message =  {
             'contentType': 'PlainText',
             'content': text
         }
 
     fulfillment_state = "Fulfilled"    
+    return close(intent_request, session_attributes, fulfillment_state, message)
+
+def recordNextVisit(contact_number, type_of_visit, visit_time):
+    # INSERT INTO ScheduleVisit(FarmerCell,VisitDate,VisitPurpose)
+    # VALUES(contact_number,  visit_time, type_of_visit);
+    print(contact_number, " ", type_of_visit, " ", visit_time)
+    
+def SchedulePickup(intent_request):
+    session_attributes = get_session_attributes(intent_request)
+    slots = get_slots(intent_request)
+    logger.debug('Slots={}'.format(slots))
+    
+    calling_number = ""
+    text = "You got it!"
+    visit_type = ""
+    visit_timestamp = ""
+    fulfillment_state = "Fulfilled"  
+
+    try:
+        # Grab caller number from the corresponding object
+        if "Connect" == intent_request["requestAttributes"]["x-amz-lex:channels:platform"]:
+                calling_number = intent_request["sessionState"]["sessionAttributes"]["InboundCallerID"]
+                calling_number = calling_number.replace("+", "")
+    # Calling number stored as sessionId from pinpoint
+    except KeyError as e:
+        calling_number = intent_request["sessionId"]
+    try:
+        visit_type = slots["AppointmentType"]["value"]["interpretedValue"]
+        visit_timestamp = slots["Date"]["value"]["interpretedValue"] + " " + slots["Time"]["value"]["interpretedValue"]
+        recordNextVisit(calling_number, visit_type, visit_timestamp)
+    except:
+          text = "I was unable to schedule your appointment please try again later!"
+          fulfillment_state = "Failed" 
+    
+    message =  {
+            'contentType': 'PlainText',
+            'content': text
+        }
+
+       
     return close(intent_request, session_attributes, fulfillment_state, message)
     
 def dispatch(intent_request):
@@ -68,8 +126,8 @@ def dispatch(intent_request):
 
     if intent_name == 'ReviewLastPickupDetails':
         return ReviewLastPickupDetails(intent_request)
-    #elif intent_name == 'OtherIntent':
-    #    return OtherIntent(intent_request)
+    elif intent_name == 'ScheduleVisit':
+        return SchedulePickup(intent_request)
 
     raise Exception('Intent with name ' + intent_name + ' not supported')
 

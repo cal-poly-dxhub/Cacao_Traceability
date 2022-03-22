@@ -1,0 +1,67 @@
+{
+    "sessionId": "8052152660",
+    "inputTranscript": "pick up details",
+    "interpretations": [
+        {
+            "intent": {
+                "slots": {},
+                "confirmationState": "None",
+                "name": "ReviewLastPickupDetails",
+                "state": "InProgress"
+            },
+            "nluConfidence": 0.51
+        },
+        {
+            "intent": {
+                "slots": {},
+                "confirmationState": "None",
+                "name": "FallbackIntent",
+                "state": "InProgress"
+            }
+        },
+        {
+            "intent": {
+                "slots": {
+                    "AppointmentType": "None",
+                    "Time": "None",
+                    "Date": "None"
+                },
+                "confirmationState": "None",
+                "name": "MakeAppointment",
+                "state": "InProgress"
+            },
+            "nluConfidence": 0.15
+        }
+    ],
+    "responseContentType": "text/plain; charset=utf-8",
+    "sessionState": {
+        "intent": {
+            "slots": {},
+            "confirmationState": "None",
+            "name": "ReviewLastPickupDetails",
+            "state": "InProgress"
+        },
+        "originatingRequestId": "7fec2d1c-680f-439f-b7f0-ff0f7c393425"
+    },
+    "messageVersion": "1.0",
+    "invocationSource": "DialogCodeHook",
+    "transcriptions": [
+        {
+            "resolvedSlots": {},
+            "resolvedContext": {
+                "intent": "ReviewLastPickupDetails"
+            },
+            "transcription": "pick up details",
+            "transcriptionConfidence": 1
+        }
+    ],
+    "inputMode": "Text",
+    "bot": {
+        "aliasName": "TestBotAlias",
+        "aliasId": "TSTALIASID",
+        "name": "PinpointDemo",
+        "version": "DRAFT",
+        "localeId": "en_US",
+        "id": "HHIVXSASZT"
+    }
+}

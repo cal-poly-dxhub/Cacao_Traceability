@@ -1,0 +1,186 @@
+{
+    "requestAttributes":
+    {
+        "x-amz-lex:accept-content-types": "PlainText,SSML",
+        "x-amz-lex:channels:platform": "Connect"
+    },
+    "sessionId": "0c294b41-2010-4cbb-bc8c-a67c8c731842",
+    "inputTranscript": "yes",
+    "interpretations":
+    [
+        {
+            "intent":
+            {
+                "slots":
+                {
+                    "AppointmentType":
+                    {
+                        "shape": "Scalar",
+                        "value":
+                        {
+                            "originalValue": "pickup",
+                            "resolvedValues":
+                            [
+                                "pickup"
+                            ],
+                            "interpretedValue": "pickup"
+                        }
+                    },
+                    "Time":
+                    {
+                        "shape": "Scalar",
+                        "value":
+                        {
+                            "originalValue": "four thirty p.m.",
+                            "resolvedValues":
+                            [
+                                "16:30"
+                            ],
+                            "interpretedValue": "16:30"
+                        }
+                    },
+                    "Date":
+                    {
+                        "shape": "Scalar",
+                        "value":
+                        {
+                            "originalValue": "tomorrow",
+                            "resolvedValues":
+                            [
+                                "2022-03-22"
+                            ],
+                            "interpretedValue": "2022-03-22"
+                        }
+                    }
+                },
+                "confirmationState": "Confirmed",
+                "name": "ScheduleVisit",
+                "state": "ReadyForFulfillment"
+            },
+            "nluConfidence": 1.0
+        },
+        {
+            "intent":
+            {
+                "slots":
+                {},
+                "confirmationState": "None",
+                "name": "Yes",
+                "state": "ReadyForFulfillment"
+            },
+            "nluConfidence": 1.0
+        },
+        {
+            "intent":
+            {
+                "slots":
+                {},
+                "confirmationState": "None",
+                "name": "FallbackIntent",
+                "state": "ReadyForFulfillment"
+            }
+        },
+        {
+            "intent":
+            {
+                "slots":
+                {},
+                "confirmationState": "None",
+                "name": "Price",
+                "state": "ReadyForFulfillment"
+            },
+            "nluConfidence": 0.37
+        },
+        {
+            "intent":
+            {
+                "slots":
+                {},
+                "confirmationState": "None",
+                "name": "ReviewLastPickupDetails",
+                "state": "ReadyForFulfillment"
+            },
+            "nluConfidence": 0.26
+        }
+    ],
+    "responseContentType": "text/plain; charset=utf-8",
+    "invocationSource": "FulfillmentCodeHook",
+    "messageVersion": "1.0",
+    "transcriptions":
+    [
+        {
+            "transcription": "yes",
+            "transcriptionConfidence": 1.0,
+            "resolvedSlots":
+            {},
+            "resolvedContext":
+            {
+                "intent": "ScheduleVisit"
+            }
+        }
+    ],
+    "sessionState":
+    {
+        "sessionAttributes":
+        {},
+        "intent":
+        {
+            "slots":
+            {
+                "AppointmentType":
+                {
+                    "shape": "Scalar",
+                    "value":
+                    {
+                        "originalValue": "pickup",
+                        "resolvedValues":
+                        [
+                            "pickup"
+                        ],
+                        "interpretedValue": "pickup"
+                    }
+                },
+                "Time":
+                {
+                    "shape": "Scalar",
+                    "value":
+                    {
+                        "originalValue": "four thirty p.m.",
+                        "resolvedValues":
+                        [
+                            "16:30"
+                        ],
+                        "interpretedValue": "16:30"
+                    }
+                },
+                "Date":
+                {
+                    "shape": "Scalar",
+                    "value":
+                    {
+                        "originalValue": "tomorrow",
+                        "resolvedValues":
+                        [
+                            "2022-03-22"
+                        ],
+                        "interpretedValue": "2022-03-22"
+                    }
+                }
+            },
+            "confirmationState": "Confirmed",
+            "name": "ScheduleVisit",
+            "state": "ReadyForFulfillment"
+        },
+        "originatingRequestId": "53bec746-32b9-4995-a97d-cfa2dc9cf18c"
+    },
+    "inputMode": "Speech",
+    "bot":
+    {
+        "aliasName": "TestBotAlias",
+        "aliasId": "TSTALIASID",
+        "name": "PinpointDemo",
+        "version": "DRAFT",
+        "localeId": "en_US",
+        "id": "HHIVXSASZT"
+    }
+}

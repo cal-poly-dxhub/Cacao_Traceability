@@ -63,7 +63,7 @@ def sendSNSFromPinpointToLex(sns_event):
     response['customerPhoneNumber'] = message['originationNumber']
     response['chatbotPhoneNumber'] = message['destinationNumber']
     user_message = message['messageBody'].lower()
-    phone_as_session = response['customerPhoneNumber'].replace("+1", "")
+    phone_as_session = response['customerPhoneNumber'].replace("+", "")
        
     logger.debug("Received SNS message: %s", received_message)
     logger.debug("UserID: %s", phone_as_session)
