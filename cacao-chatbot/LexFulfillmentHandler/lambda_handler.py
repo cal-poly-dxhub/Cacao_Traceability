@@ -1,8 +1,9 @@
 import os
 import logging
 import pyqldb
-import pymysql
+
 from pyqldb.driver.qldb_driver import QldbDriver
+from db_utility import recordNextVisit, getMarketPriceDB
 
 qldb_driver = QldbDriver(ledger_name='cacao-ledger-test')
 
@@ -80,11 +81,7 @@ def ReviewLastPickupDetails(intent_request):
     fulfillment_state = "Fulfilled"    
     return close(intent_request, session_attributes, fulfillment_state, message)
 
-def recordNextVisit(contact_number, type_of_visit, visit_time):
-    # INSERT INTO ScheduleVisit(FarmerCell,VisitDate,VisitPurpose)
-    # VALUES(contact_number,  visit_time, type_of_visit);
-    print(contact_number, " ", type_of_visit, " ", visit_time)
-    
+
 def SchedulePickup(intent_request):
     session_attributes = get_session_attributes(intent_request)
     slots = get_slots(intent_request)
@@ -119,7 +116,19 @@ def SchedulePickup(intent_request):
 
        
     return close(intent_request, session_attributes, fulfillment_state, message)
-    
+
+def getPrice(intent_request):
+    session_attributes = get_session_attributes(intent_request)
+    fulfillment_state = "Failed" 
+    text = "Current market price is " + getMarketPriceDB()
+    fulfillment_state = "Fulfilled"  
+    message =  {
+            'contentType': 'PlainText',
+            'content': text
+        }
+
+       
+    return close(intent_request, session_attributes, fulfillment_state, message)    
 def dispatch(intent_request):
     intent_name = intent_request['sessionState']['intent']['name']
     response = None
@@ -128,6 +137,8 @@ def dispatch(intent_request):
         return ReviewLastPickupDetails(intent_request)
     elif intent_name == 'ScheduleVisit':
         return SchedulePickup(intent_request)
+    elif intent_name == 'Price':
+        return getPrice(intent_request)
 
     raise Exception('Intent with name ' + intent_name + ' not supported')
 
