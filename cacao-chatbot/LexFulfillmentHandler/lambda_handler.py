@@ -3,7 +3,7 @@ import logging
 import pyqldb
 
 from pyqldb.driver.qldb_driver import QldbDriver
-from db_utility import recordNextVisit, getMarketPriceDB
+from db_utility import recordNextVisit, getMarketPriceDB, getLastPickupDetails
 
 qldb_driver = QldbDriver(ledger_name='cacao-ledger-test')
 
@@ -64,15 +64,24 @@ def findFarmersBuckets(transaction_executor, farmerID):
 def ReviewLastPickupDetails(intent_request):
     session_attributes = get_session_attributes(intent_request)
     slots = get_slots(intent_request)
-    
-    count = qldb_driver.execute_lambda(lambda executor: findFarmersBuckets(executor, "d2066964-a2b3-4ab8-9783-f4f40bdc3b3e"))
-    text = ""
-    if count == 0:
-        text = "There where no recorded pickups today."
-    elif count == 1:
-         text = "We recorded " + str(count) + " bucket picked up today.  Thanks for your business."
-    else:
-        text = "We recorded " + str(count) + " buckets picked up today.  Thanks for your business."
+    calling_number = ""
+    #count = qldb_driver.execute_lambda(lambda executor: findFarmersBuckets(executor, "d2066964-a2b3-4ab8-9783-f4f40bdc3b3e"))
+    # text = ""
+    # if count == 0:
+    #     text = "There where no recorded pickups today."
+    # elif count == 1:
+    #      text = "We recorded " + str(count) + " bucket picked up today.  Thanks for your business."
+    # else:
+    #     text = "We recorded " + str(count) + " buckets picked up today.  Thanks for your business."
+    try:
+        # Grab caller number from the corresponding object
+        if "Connect" == intent_request["requestAttributes"]["x-amz-lex:channels:platform"]:
+                calling_number = intent_request["sessionState"]["sessionAttributes"]["InboundCallerID"]
+                calling_number = calling_number.replace("+", "")
+    # Calling number stored as sessionId from pinpoint
+    except KeyError as e:
+        calling_number = intent_request["sessionId"]
+    text = getLastPickupDetails(calling_number)
     message =  {
             'contentType': 'PlainText',
             'content': text
@@ -120,7 +129,7 @@ def SchedulePickup(intent_request):
 def getPrice(intent_request):
     session_attributes = get_session_attributes(intent_request)
     fulfillment_state = "Failed" 
-    text = "Current market price is " + getMarketPriceDB()
+    text = "Current market price is " + getMarketPriceDB() + " Colombian pesos"
     fulfillment_state = "Fulfilled"  
     message =  {
             'contentType': 'PlainText',

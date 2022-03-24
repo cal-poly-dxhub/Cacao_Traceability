@@ -61,9 +61,8 @@ def getMarketPriceDB():
 
 
         records = cur.fetchall()
-        print("Total number of rows in table: ", cur.rowcount)
+        #print("Total number of rows in table: ", cur.rowcount)
 
-        print("\nPrinting each row")
         for row in records:
             price = row[0]
         conn.close()
@@ -73,6 +72,37 @@ def getMarketPriceDB():
     return price
 
 
+def getLastPickupDetails(farmerID):
+    text = "There was an error finding the last transaction."
+    try:
+        conn = pymysql.connect(
+            host="cacao-db.cpzzbnizneyx.us-west-2.rds.amazonaws.com",
+            user="admin",
+            password="",
+            database="Cacao",
+            connect_timeout=5
+        )
+        cur = conn.cursor()
+        sql = "SELECT pickup_date, weight, price_per_kg FROM Transactions where farmerID = %s Order by pickup_date DESC limit 1"
+        logger.debug('SQL={}'.format(sql))
+        cur.execute(sql, (farmerID))
+
+
+        records = cur.fetchall()
+        #print("Total number of rows in table: ", cur.rowcount)
+        logger.debug('records={}'.format(records))
+        for row in records:
+            text = "Your last pickup was on " + row[0].strftime("%m/%d/%Y, %H:%M:%S")
+            logger.debug('text={}'.format(text))
+            text = text + " and included " + str(row[1]) + " kilograms. "
+            logger.debug('text={}'.format(text))
+            text = text + "Your total receipt was for " + str(round(row[2]*row[1],2)) + " Colombian pesos."
+            logger.debug('Text={}'.format(text))
+        conn.close()
+    except Exception as e:
+        print("Error reading data from MySQL table", e)
+    
+    return text
 
 
 
