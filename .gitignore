@@ -4,3 +4,7 @@ misc/
 __pycache__/
 downloaded/
 *.pem
+*.tif
+*.aux.xml
+*.ovr
+auth/
