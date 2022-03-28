@@ -21,6 +21,7 @@ def get_granule_filename(granule):
 def create_mosaic(date_latest, date_earliest, df, name):
     df = df[(df['date'] > date_earliest) & 
             (df['date'] <= date_latest)]
+    
     granules = df.apply(get_granule_filename, axis=1).tolist()
 
     # build vrts
@@ -36,7 +37,7 @@ def create_mosaic(date_latest, date_earliest, df, name):
     # flush cache
     vrt = tif = None
 
-    os.remove(vrt_filename)
+    # os.remove(vrt_filename)
     return tif_filename
 
 
@@ -72,13 +73,13 @@ def main():
     # load database of granules
     # TODO: turn this into a proper database
     # using a csv file as a temp measure
-    granules = pd.read_csv("s2-granules.csv")
+    granules = pd.read_csv("l8-granules-2.csv")
     granules['date'] = pd.to_datetime(granules['date'])
-    granules = granules.sort_values(by="date", ascending=False)
+    granules = granules.sort_values(by="date", ascending=True)
     
     start_tif = create_mosaic(start, start_d, granules, "start")
     end_tif = create_mosaic(end, end_d, granules, "end")
-
+    
     # build a combined vrt with the start and end rasters. this will automatically handle differences in bounds
     print("Building combined VRT from TIF images...")
     combined_file = "combined.vrt"
@@ -94,16 +95,16 @@ def main():
     diff = np.subtract(end_band, start_band)
 
     # save results to geotiff
-    diff_file = f"diff_{args.ds}_{args.start}_{args.end}"
+    diff_file = f"diff_{args.ds}_{args.start}_{args.end}.tif"
     arr_to_gtiff(diff, diff_file, combined_file)
     
     # flush cashe
     combined = start_band = end_band = None
 
     # remove unnecessary files
-    os.remove(start_tif)
-    os.remove(end_tif)
-    os.remove(combined_file)
+    # os.remove(start_tif)
+    # os.remove(end_tif)
+    # os.remove(combined_file)
     print("Done.")
 
 
