@@ -5,6 +5,9 @@ from osgeo import gdal
 import numpy as np
 import boto3
 
+from processing_utils import mask_clouds_and_calc_ndvi, arr_to_gtiff
+
+
 def lambda_handler(event, context):
     bucket = event['Records'][0]['s3']['bucket']['name']
     key = urllib.parse.unquote_plus(event['Records'][0]['s3']['object']['key'], encoding='utf-8')
@@ -27,7 +30,7 @@ def lambda_handler(event, context):
     os.remove(result)
     
     
-""" Given a Landsat 8 scene, caclulate NDVI, mask clouds, and upload the result in dest_bucket. """
+""" Given a the base name of a Landsat 8 scene, caclulate NDVI, mask clouds, and save the result as a geotiff. """
 def calc_ndvi_and_mask_l8_clouds(file):
     red_band = "SR_B4"
     nir_band = "SR_B5"
@@ -46,13 +49,6 @@ def calc_ndvi_and_mask_l8_clouds(file):
     qa_ds = gdal.Open(qa_band_file)
     qa = qa_ds.GetRasterBand(1).ReadAsArray()
     
-    # calculate NDVI
-    # TODO: this throws a warning, but the actual file looks fine. I'm guessing
-    # it has to do with the fact that the tifs are rotated--maybe numpy is padding
-    # them with zeroes to compensate, which causes some calculations to be 0/0.
-    ndvi = np.divide(np.subtract(nir, red), np.add(nir, red))
-    ndvi = np.where(ndvi == np.inf, np.nan, ndvi)
-    
     # calculate cloud mask
     # bits 3 and 4 are cloud and cloud shadow, respectively
     cloud_bit = 1 << 3
@@ -60,34 +56,11 @@ def calc_ndvi_and_mask_l8_clouds(file):
     bit_mask = cloud_bit | cloud_shadow_bit
     cloud_mask = ((np.bitwise_and(qa, bit_mask) != 0) * 1).astype(np.int16)
     
-    # update mask of target_band
-    ndvi_masked = np.where(cloud_mask, np.nan, ndvi)
-    
-    # get gt, projection, and size from red band
-    gt = red_ds.GetGeoTransform()
-    proj = red_ds.GetProjection()
-    xsize = red_ds.RasterXSize
-    ysize = red_ds.RasterYSize
-    
+    ndvi_masked = mask_clouds_and_calc_ndvi(red, nir, cloud_mask)
     ndvi_masked_file = f"{base_name}_NDVI_MASKED.TIF"
-    
-    # write mask to new file
-    driver = gdal.GetDriverByName("GTiff")
-    driver.Register()
-    out_ds = driver.Create(ndvi_masked_file,
-                          xsize = xsize,
-                          ysize = ysize,
-                          bands = 1,
-                          eType = gdal.GDT_Float32)
-    out_ds.SetGeoTransform(gt)
-    out_ds.SetProjection(proj)
-    outband = out_ds.GetRasterBand(1)
-    outband.WriteArray(ndvi_masked)
-    outband.SetNoDataValue(np.nan)
-    outband.FlushCache
+    arr_to_gtiff(ndvi_masked, ndvi_masked_file, red_band_file)
     
     # free data so it saves to disk properly
-    red_ds = nir_ds = qa_ds = out_ds = outband = gt = proj = xsize = ysize = driver = None
-    red = nir = qa = ndvi_masked = None
+    red_ds = nir_ds = qa_ds = out_ds = outband = driver = None
     
     return ndvi_masked_file
