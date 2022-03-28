@@ -241,18 +241,7 @@ $RECYCLE.BIN/
 
 */build/*
 
-# Folders to ignore
-downloaded/
-qa/
-vis/
-
-# Potentially sensitive authentication files
-auth/
-*.pem
-
-# Geotiff artifacts
-*.tif
-*.aux.xml
-*.ovr
-
 # End of https://www.gitignore.io/api/osx,linux,python,windows,pycharm,visualstudiocode
+
+.aws-sam/*
+

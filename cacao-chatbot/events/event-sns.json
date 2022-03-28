@@ -1,0 +1,29 @@
+{
+    "Records": [
+        {
+            "EventSource": "aws:sns",
+            "EventVersion": "1.0",
+            "EventSubscriptionArn": "arn:aws:sns:us-west-2:285396213403:LexPinpointIntegration:9d821c3f-e2f4-4ed8-81ae-e23178217fd3",
+            "Sns": {
+                "Type": "Notification",
+                "MessageId": "3fa17965-7006-5c25-8d4e-23c10320a0ac",
+                "TopicArn": "arn:aws:sns:us-west-2:285396213403:LexPinpointIntegration",
+                "Subject": "None",
+                "Message": {
+                    "originationNumber": "+18052152660",
+                    "destinationNumber": "+18559365255",
+                    "messageKeyword": "KEYWORD_285396213403",
+                    "messageBody": "book an appointment",
+                    "previousPublishedMessageId": "skjgtkb27kqmajjprfhmh01ssngm9m1jesoqnh00",
+                    "inboundMessageId": "be1ce597-2060-43db-9a5c-e042924a2b0d"
+                },
+                "Timestamp": "2022-03-10T21:43:02.483Z",
+                "SignatureVersion": "1",
+                "Signature": "jVEbotK+QoYfbymmj8KXfRHhn81fN0Uc4aynDqHPm3gZgXe24C2Jw5krOSArSfYzWAUtuu0CCg0leEYogoqqguVxkBLQ1NdAhNGQR7ZW1XudjNeEjjLfNK8yFDiOTu3amRYgxeHPBAto1hOscx2VUPzT1CCA/akYdEYbmqvUrZXhH2vg1K9++hEzYhatEnBs0hzoWq3LDax3fJ3GKwB+VskIKsza4tffKaJajK+r1Y8n/sbjAs9BsbhDGQUKW3Xmj9XKQSuX2+27Vyp06CTaA+9B39RXWBhXoHfzsd/vhspweXjZMV7sSQwaVoZmbLsqsc+QFcfJizUyhjrK8wqI3A==",
+                "SigningCertUrl": "https://sns.us-west-2.amazonaws.com/SimpleNotificationService-7ff5318490ec183fbaddaa2a969abfda.pem",
+                "UnsubscribeUrl": "https://sns.us-west-2.amazonaws.com/?Action=Unsubscribe&SubscriptionArn=arn:aws:sns:us-west-2:285396213403:LexPinpointIntegration:9d821c3f-e2f4-4ed8-81ae-e23178217fd3",
+                "MessageAttributes": {}
+            }
+        }
+    ]
+}
