@@ -9,7 +9,6 @@ import boto3
 from sentinelhub import SHConfig, WebFeatureService, DataCollection, Geometry, AwsTileRequest, AwsTile
 
 
-DATA_COLLECTION = DataCollection.SENTINEL2_L2A # use only L2A scenes
 QUEUE = "S2ImgsToBeProcessed" # name of sqs queue to send messages to for processing
 REGION = "us-west-2" # aws region of queue
 
@@ -28,9 +27,9 @@ def authenticate():
 
 
 """ Search for images matching a certain criteria, and return a list of products that can
-    be downloaded. date_range should be a tuple, cloud_max should be an int, and boundary
-    should oint to a GeoJSON file. Reserving **kwargs to be used in the future if needed. """
-def search(config, dataset=None,  date_range=None, cloud_max=1, boundary=None, **kwargs):
+    be downloaded. date_range should be a tuple, cloud_max should be an int, boundary
+    should point to a GeoJSON file, and collection should be either 'L2A' or 'L1C'. """
+def search(config, dataset=None,  date_range=None, cloud_max=1, boundary=None, collection="L2A"):
     # convert geojson to BBox object
     if boundary:
         with open(boundary) as file:
@@ -40,10 +39,17 @@ def search(config, dataset=None,  date_range=None, cloud_max=1, boundary=None, *
     else:
         bbox = None
 
+    if collection == "L2A":
+        data_collection = DataCollection.SENTINEL2_L2A
+    elif collection == "L1C":
+        data_collection = DataCollection.SENTINEL2_L1C
+    else:
+        raise ValueError(f"unsupported collection: {collection}")
+
     wfs_iterator = WebFeatureService(
         bbox,
         date_range,
-        data_collection=DATA_COLLECTION,
+        data_collection=data_collection,
         maxcc=cloud_max,
         config=config
     )
@@ -56,7 +62,7 @@ def search(config, dataset=None,  date_range=None, cloud_max=1, boundary=None, *
 
 """ Given a list of tiles in the Sentinelhub S2 bucket and a list of files to copy for
     each tile, copy those files into dst_bucket. """
-def copy_to_s3(tile_list, dst_bucket, files):
+def copy_to_s3(tile_list, dst_bucket, files, prefix="s2"):
     s3 = boto3.resource('s3')
     sqs = boto3.resource("sqs", region_name=REGION)
     q = sqs.get_queue_by_name(QueueName=QUEUE)
@@ -89,8 +95,8 @@ def copy_to_s3(tile_list, dst_bucket, files):
         # pad month and day with a zero if necessary
         month = pad_zeroes(m.group('month'))
         day = pad_zeroes(m.group('day'))
-        tile_prefix = (f"sentinel-2/{m.group('utm')}/{m.group('lat')}/{m.group('square')}/"
-                        f"{m.group('year')}/{month}/{id}_{m.group('sequence')}{id}_{m.group('sequence')}/")
+        tile_prefix = (f"{prefix}/{m.group('utm')}/{m.group('lat')}/{m.group('square')}/"
+                        f"{m.group('year')}/{month}/{id}_{m.group('sequence')}/{id}_{m.group('sequence')}")
         print(f"Copying to s3://{dst_bucket}/{tile_prefix}")
         for file in files:
             # split bucket name from key
@@ -116,12 +122,19 @@ def pad_zeroes(string):
 
 
 # download tiles locally
-def download(downloads, bands=['R10m/B04', 'R10m/B08'], metafiles=['tileInfo', 'qi/MSK_CLOUDS_B00'], data_folder="."):
+def download(downloads, bands=['R10m/B04', 'R10m/B08'], metafiles=['tileInfo', 'qi/MSK_CLOUDS_B00'], data_folder=".", collection="L2A"):
     # by default, select R/NIR bands, tile info metadata file, and cloud mask
 
     download = input(f"Download {len(downloads)} scene(s)? (Y/N) ")
     if download.lower() not in {'y', 'yes'}:
         return None
+
+    if collection == "L2A":
+        data_collection = DataCollection.SENTINEL2_L2A
+    elif collection == "L1C":
+        data_collection = DataCollection.SENTINEL2_L1C
+    else:
+        raise ValueError(f"unsupported collection: {collection}")
 
     downloaded = []
     for tile in downloads:
@@ -133,7 +146,7 @@ def download(downloads, bands=['R10m/B04', 'R10m/B08'], metafiles=['tileInfo', '
             bands = bands,
             metafiles = metafiles,
             data_folder = data_folder,
-            data_collection = DATA_COLLECTION
+            data_collection = data_collection
         )
 
         # trigger download
@@ -150,11 +163,13 @@ def main():
     parser.add_argument("-date-range", "--dr", metavar=("start", "end"), 
                         dest="date_range", nargs=2, type=str,
                         help="filter scenes by acquisition date (format: yyyy-mm-dd yyyy-mm-dd)")
-    parser.add_argument("-cloud-max", "--cm", dest="cloud_max", type=int,
+    parser.add_argument("-cloud-max", "--cm", dest="cloud_max", type=float,
                         help="filter scenes by cloud cover")
     parser.add_argument("-boundary", "--b", metavar="path/to/geojson",
                         dest="boundary", type=Path,
                         help="path to geojson file with boundary of search")
+    parser.add_argument("-collection", "--c", dest="collection", choices=["L2A", "L1C"],
+                        help="collection of s2 images to choose from (top of atmosphere/surface reflectance")
     parser.add_argument("-dst", metavar="bucket", type=str,
                         help="s3 bucket to store downloaded scenes in")
     args = parser.parse_args()
@@ -165,9 +180,10 @@ def main():
     config = authenticate()
 
     print("Fetching scenes...")
-    tile_list = search(config, date_range=args.date_range, boundary=args.boundary)
+    tile_list = search(config, date_range=args.date_range, boundary=args.boundary, collection=args.collection)
     # grab only desired files: R band, NIR band, metadata file, and cloud mask
-    files = ['R10m/B04.jp2', 'R10m/B08.jp2', 'tileInfo.json', 'qi/MSK_CLOUDS_B00.gml']
+    # files = ['R10m/B04.jp2', 'R10m/B08.jp2', 'tileInfo.json', 'qi/MSK_CLOUDS_B00.gml']
+    files = ['B04.jp2', 'B08.jp2', 'tileInfo.json', 'qi/MSK_CLOUDS_B00.gml']
 
     if len(tile_list) == 0:
         print("No tiles matching the criteria were found.")
@@ -177,7 +193,7 @@ def main():
     if download.lower() not in {'y', 'yes'}:
         return None
 
-    copy_to_s3(tile_list, args.dst, files)
+    copy_to_s3(tile_list, args.dst, files, prefix=f"s2-{args.collection.lower()}")
     
     print("Done.")
 
