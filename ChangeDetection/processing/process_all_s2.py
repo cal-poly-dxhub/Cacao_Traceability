@@ -5,6 +5,7 @@ from osgeo import gdal
 import numpy as np
 import boto3
 
+
 from processing_utils import mask_clouds_and_calc_ndvi, arr_to_gtiff
 
 
@@ -63,11 +64,18 @@ def main():
     granules = []
     for key in response['Contents']:
             path = os.path.dirname(key['Key'])
-            granule = f"{src_bucket}/{path}/{os.path.basename(path)}"
-            granules.append(granule)
+            granule = f"{path}/{os.path.basename(path)}"
+            try:
+                # check if file already exists
+                s3.Object(dest_bucket, f"{granule}_NDVI_MASKED.TIF").load()
+            except botocore.exceptions.ClientError as e:
+                if e.response['Error']['Code'] == "404":
+                    granules.append(f"{src_bucket}/{granule}")
+                else:
+                    raise e
 
     granules = set(granules)
-    
+
     for granule in granules:
         prefix = granule.split('/', 1)
         bucket = prefix[0]
