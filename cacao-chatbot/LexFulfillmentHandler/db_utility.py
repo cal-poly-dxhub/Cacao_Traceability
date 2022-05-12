@@ -29,7 +29,7 @@ def recordNextVisit(contact_number, type_of_visit, visit_time):
         conn = pymysql.connect(
             host="cacao-db.cpzzbnizneyx.us-west-2.rds.amazonaws.com",
             user="admin",
-            password="",
+            password="N7cXHRc0GaJeKKGVmQtLwGnN0VM",
             database="Cacao",
             connect_timeout=5
         )
@@ -50,7 +50,7 @@ def getMarketPriceDB():
         conn = pymysql.connect(
             host="cacao-db.cpzzbnizneyx.us-west-2.rds.amazonaws.com",
             user="admin",
-            password="",
+            password="N7cXHRc0GaJeKKGVmQtLwGnN0VM",
             database="Cacao",
             connect_timeout=5
         )
@@ -72,31 +72,33 @@ def getMarketPriceDB():
     return price
 
 
-def getLastPickupDetails(farmerID):
+def getLastPickupDetails(farmerID, number_trans):
     text = "There was an error finding the last transaction."
     try:
         conn = pymysql.connect(
             host="cacao-db.cpzzbnizneyx.us-west-2.rds.amazonaws.com",
             user="admin",
-            password="",
+            password="N7cXHRc0GaJeKKGVmQtLwGnN0VM",
             database="Cacao",
             connect_timeout=5
         )
         cur = conn.cursor()
-        sql = "SELECT pickup_date, weight, price_per_kg FROM Transactions where farmerID = %s Order by pickup_date DESC limit 1"
+        sql = "SELECT pickup_date, weight, price_per_kg FROM Transactions where farmerID = %s Order by pickup_date DESC limit %s"
         logger.debug('SQL={}'.format(sql))
-        cur.execute(sql, (farmerID))
+        print (type(number_trans))
+        cur.execute(sql, (farmerID, int(number_trans)))
 
 
         records = cur.fetchall()
         #print("Total number of rows in table: ", cur.rowcount)
         logger.debug('records={}'.format(records))
+        text = ""
         for row in records:
-            text = "Your last pickup was on " + row[0].strftime("%m/%d/%Y, %H:%M:%S")
+            text = text + "Your pickup on " + row[0].strftime("%m/%d/%Y, %H:%M:%S")
             logger.debug('text={}'.format(text))
-            text = text + " and included " + str(row[1]) + " kilograms. "
+            text = text + " included " + str(row[1]) + " kilograms. "
             logger.debug('text={}'.format(text))
-            text = text + "Your total receipt was for " + str(round(row[2]*row[1],2)) + " Colombian pesos."
+            text = text + "Your total receipt for that pickup was " + str(round(row[2]*row[1],2)) + " Colombian pesos. "
             logger.debug('Text={}'.format(text))
         conn.close()
     except Exception as e:

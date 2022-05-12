@@ -64,7 +64,10 @@ def findFarmersBuckets(transaction_executor, farmerID):
 def ReviewLastPickupDetails(intent_request):
     session_attributes = get_session_attributes(intent_request)
     slots = get_slots(intent_request)
+    logger.debug('Slots={}'.format(slots))
     calling_number = ""
+    number_of_trans = slots["Trans"]["value"]["interpretedValue"]
+    logger.debug('Trans={}'.format(number_of_trans))
     #count = qldb_driver.execute_lambda(lambda executor: findFarmersBuckets(executor, "d2066964-a2b3-4ab8-9783-f4f40bdc3b3e"))
     # text = ""
     # if count == 0:
@@ -81,7 +84,7 @@ def ReviewLastPickupDetails(intent_request):
     # Calling number stored as sessionId from pinpoint
     except KeyError as e:
         calling_number = intent_request["sessionId"]
-    text = getLastPickupDetails(calling_number)
+    text = getLastPickupDetails(calling_number, number_of_trans)
     message =  {
             'contentType': 'PlainText',
             'content': text

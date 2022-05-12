@@ -17,10 +17,6 @@ PINPOINT_APPLICATION = os.environ.get('PINPOINT_APPLICATION')
 LEX_BOT_ID = os.environ.get('LEX_BOT_ID')
 LEX_BOT_ALIAS = os.environ.get('LEX_BOT_ALIAS')
 
-# LEX_BOT_ALIAS="TSTALIASID"
-# LEX_BOT_ID="HHIVXSASZT"
-# PINPOINT_APPLICATION="686caf3d3c514bd5bb1a25d60f17b478"
-
 logger.debug("ENV PINPOINT_APPLICATION=%s LEX_BOT_ID=%s LEX_BOT_ALIAS=%s",PINPOINT_APPLICATION, LEX_BOT_ID, LEX_BOT_ALIAS)
 
 def sendResponse(response_str, customerPhoneNumber,chatbotPhoneNumber):
@@ -58,8 +54,7 @@ def sendSNSFromPinpointToLex(sns_event):
     # Locally this was a dict but a str in AWS?
     if isinstance(message, str):
         message = json.loads(sns_event['Records'][0]['Sns']['Message'])
-    #print("DEK",type(message))
-    #print("DEK",message)
+
     response['customerPhoneNumber'] = message['originationNumber']
     response['chatbotPhoneNumber'] = message['destinationNumber']
     user_message = message['messageBody'].lower()
