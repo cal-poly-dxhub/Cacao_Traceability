@@ -1,20 +1,93 @@
 from pathlib import Path
 import os
+import re
 
+from osgeo import gdal
 import numpy as np
 import rasterio
+import cv2 as cv
+import boto3
 
-# Enhanced Lee filter for speckle reduction.
-def enhanced_lee(file, lee_win_size=5, lee_num_looks=1):
-    bands = []
+
+s3 = boto3.client('s3')
+
+
+# Enhanced Lee Filter for speckle reduction
+def enhanced_lee(img, win_size=5, num_looks=1, nodata=None):
+    src_dtype = img.dtype
+    img = img.astype(np.float64)
+
+    # Get image mask (0: nodata; 1: data)
+    mask = np.ones(img.shape)
+    mask[img == nodata] = 0
+    mask[np.isnan(img)] = 0     # in case there are pixels of NaNs
+
+    # Change nodata pixels to 0 so they don't contribute to the sums
+    img[mask == 0] = 0
+
+    # Kernel size
+    ksize = (win_size, win_size)
+
+    # Window sum of image values
+    img_sum = cv.boxFilter(img, -1, ksize,
+                           normalize=False, borderType=cv.BORDER_ISOLATED)
+    # Window sum of image values squared
+    img2_sum = cv.boxFilter(img**2, -1, ksize,
+                            normalize=False, borderType=cv.BORDER_ISOLATED)
+    # Pixel number within window
+    pix_num = cv.boxFilter(mask, -1, ksize,
+                           normalize=False, borderType=cv.BORDER_ISOLATED)
+
+    # There might be a loss of accuracy as how boxFilter handles floating point
+    # number subtractions/additions, causing a window of all zeros to have
+    # non-zero sum, hence correction here using np.isclose.
+    img_sum[np.isclose(img_sum, 0)] = 0
+    img2_sum[np.isclose(img2_sum, 0)] = 0
+
+    # Get image mean and std within window
+    img_mean = np.full(img.shape, np.nan, dtype=np.float64)     # E[X]
+    img2_mean = np.full(img.shape, np.nan, dtype=np.float64)    # E[X^2]
+    img_mean2 = np.full(img.shape, np.nan, dtype=np.float64)    # (E[X])^2
+    img_std = np.full(img.shape, 0, dtype=np.float64)           # sqrt(E[X^2] - (E[X])^2)
+
+    idx = np.where(pix_num != 0)                # Avoid division by zero
+    img_mean[idx] = img_sum[idx]/pix_num[idx]
+    img2_mean[idx] = img2_sum[idx]/pix_num[idx]
+    img_mean2 = img_mean**2
+
+    idx = np.where(~np.isclose(img2_mean, img_mean2))           # E[X^2] and (E[X])^2 are close
+    img_std[idx] = np.sqrt(img2_mean[idx] - img_mean2[idx])
+
+    # Get weighting function
+    k = 1
+    cu = 0.523/np.sqrt(num_looks)
+    cmax = np.sqrt(1 + 2/num_looks)
+    ci = img_std / img_mean         # it's fine that img_mean could be zero here
+    w_t = np.zeros(img.shape)
+    w_t[ci <= cu] = 1
+    idx = np.where((cu < ci) & (ci < cmax))
+    w_t[idx] = np.exp((-k * (ci[idx] - cu)) / (cmax - ci[idx]))
+
+    # Apply weighting function
+    img_filtered = (img_mean * w_t) + (img * (1 - w_t))
+
+    # Assign nodata value
+    img_filtered[pix_num == 0] = nodata
+
+    return img_filtered.astype(src_dtype)
+
+
+# Filter VV/VH bands using Enhanced Lee Filter
+def filter(file, bands, lee_win_size=5, lee_num_looks=1):
+    filtered = []
     # Process backscatter (VV/VH)
-    for pq in ['VV', 'VH']:
+    for pq in bands:
+        print(f"Processing {pq} for {file}...")
         # Read in DN
         basename = os.path.splitext(os.path.basename(file))[0]
         dn_raster = f"{file}/{basename}/{basename}_{pq}.tif"
         with rasterio.open(dn_raster) as dset:
             dn = dset.read(1).astype(np.float64)
-            print(dn)
             mask = dset.read_masks(1)
             dn[mask == 0] = np.nan
             profile = dset.profile
@@ -31,41 +104,78 @@ def enhanced_lee(file, lee_win_size=5, lee_num_looks=1):
         with rasterio.open(g0_filtered_tif, 'w', **profile) as dset:
             dset.write(g0_filtered.astype(np.float32), 1)
 
-        bands.append(g0_filtered_tif)
+        filtered.append(str(g0_filtered_tif))
     
-    return bands
+    return filtered
+
+
+# # TODO: will need to reproject images properly
+# def stack_imgs(zipfile):
+#     basename = os.path.splitext(os.path.basename(zipfile))[0]
+#     print(f"Creating data stack for {basename}...")
+
+#     vv, vh = filter(f"/vsizip/vsis3/{zipfile}")
+#     inc = f"/vsizip/vsis3/{zipfile}/{basename}/{basename}_inc_map.tif"
+#     # go up two directories. lol
+#     year = os.path.basename(os.path.dirname(os.path.dirname(zipfile)))
+#     tree_cover = f"/vsis3/{os.path.dirname(os.path.dirname(zipfile))}/tree_cover_{year}_projected.tif" 
+
+#     files = [vv, vh, inc, tree_cover]
+
+#     vrt_filename = f"{basename}.vrt"
+#     print(f"Building {vrt_filename}...")
+#     vrt = gdal.BuildVRT(vrt_filename, files, separate=True)
+
+#     # convert vrt to tif
+#     tif_filename = f"{basename}.tif"
+#     print(f"Translating {vrt_filename} to {tif_filename}...")
+#     tif = gdal.Translate(tif_filename, vrt, format="GTiff")
+
+#     # flush cache
+#     vrt = tif = None
+
+#     os.remove(vrt_filename)
+#     return tif_filename
+
+
+def process(zipfile):
+    basename = os.path.splitext(os.path.basename(zipfile))[0]
+    print(f"Processing {basename}...")
+
+    # enhanced lee filter
+    bands = ['VV', 'VH']
+    processed = filter(f"/vsizip/vsis3/{zipfile}", bands)
+
+    # upload to s3
+    dest_bucket = "processed-granules"
+    s1_name_pattern = re.compile(r"""
+            (?:raw-granules/sentinel_1/)
+            (?P<year>\d{4})
+            (?:/)
+            (?P<path>\d{1,4})
+            (?:_)
+            (?P<frame>\d{1,4})
+            (?:/)
+            (?P<id>(.*)?)
+            (?:\.zip)
+            """, re.VERBOSE)
+    
+    m = s1_name_pattern.match(zipfile)
+    month = m.group('id')[11:13]
+    prefix = f"s1/{m.group('path')}/{m.group('frame')}/{m.group('year')}/{month}/{basename}/{basename}"
+    
+    for file, postfix in zip(processed, bands):
+        key = f"{prefix}_{postfix}_FILTERED.tif"
+        s3.upload_file(file, dest_bucket, key)
+        print(f"Uploaded {key} to {dest_bucket}")
+        os.remove(file)
 
 
 def main():
-    # parser = argparse.ArgumentParser(
-    #     description='processing ALOS/ALOS-2 yearly mosaic data'
-    # )
-    # parser.add_argument('proj_dir', metavar='proj_dir',
-    #                     type=str,
-    #                     help=('project directory (s3:// or gs:// or local dirs); '
-    #                           'ALOS/ALOS-2 mosaic data (.tar.gz) are expected '
-    #                           'to be found under proj_dir/alos2_mosaic/year/tarfiles/'))
-    # parser.add_argument('year', metavar='year',
-    #                     type=int,
-    #                     help='year')
-    # parser.add_argument('--filter_win_size', metavar='win_size',
-    #                     type=int,
-    #                     default=5,
-    #                     help='Filter window size')
-    # parser.add_argument('--filter_num_looks', metavar='num_looks',
-    #                     type=int,
-    #                     default=1,
-    #                     help='Filter number of looks')
-    # args = parser.parse_args()
-
-    # proc_tiles(args.proj_dir, args.year, args.filter_win_size, args.filter_num_looks)
-    # Project directory on S3
-    
-    # file = "..\\downloaded\\s1_asf\\77_1191\\S1B_IW_20200118T230446_DVP_RTC30_G_gpunem_ED01.zip"
-    file = "/vsizip/vsis3/vegmapper-test/colombia/sentinel_1/2020/150_1191/S1B_IW_20201001T231307_DVP_RTC30_G_gpunem_4B05.zip"
-    vv, vh = enhanced_lee(file)
-    print(vv)
-    print(vh)
+    src_bucket = "raw-granules"
+    for file in s3.list_objects(Bucket=src_bucket, Prefix="sentinel_1")['Contents']:
+        file = f"{src_bucket}/{file['Key']}"
+        process(file)
 
 
 if __name__ == '__main__':

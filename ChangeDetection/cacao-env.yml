@@ -11,3 +11,5 @@ dependencies:
   - sentinelhub
   - python=3.9
   - requests
+  - rasterio
+  - opencv

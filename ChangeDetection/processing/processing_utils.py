@@ -4,7 +4,7 @@ import numpy as np
 
 """ Given a numpy array and an output name, save the array as a geotiff using
     base_tif to set the geotransform and projection of the new geotiff. """
-def arr_to_gtiff(arr, out_name, base_tif):
+def arr_to_gtiff(arr, out_name, base_tif, dtype=gdal.GDT_Float32):
     base_ds = gdal.Open(base_tif)
 
     # get geotransform, projection, and size from the base geotiff
@@ -20,7 +20,7 @@ def arr_to_gtiff(arr, out_name, base_tif):
                           xsize = xsize,
                           ysize = ysize,
                           bands = 1,
-                          eType = gdal.GDT_Float32)
+                          eType = dtype)
     out_ds.SetGeoTransform(gt)
     out_ds.SetProjection(proj)
     outband = out_ds.GetRasterBand(1)
