@@ -71,7 +71,7 @@ def submit_jobs(hyp3, granules):
         print(f"Submitting granule {granule}...")
 
         hyp3.submit_rtc_job(granule, granule, resolution=30.0, radiometry='gamma0',
-                            scale='power', speckle_filter=True, dem_matching=True,
+                            scale='power', speckle_filter=False, dem_matching=True,
                             include_dem=False, include_inc_map=True, include_scattering_area=False)
 
 
