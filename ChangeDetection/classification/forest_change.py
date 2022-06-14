@@ -14,7 +14,7 @@ def get_granule_filename(granule):
     return f"/vsis3/{granule['bucket']}/{granule['key']}"
 
 
-n_obs = 5
+n_obs = 3
 
 
 def main():
@@ -34,7 +34,7 @@ def main():
     granules['date'] = pd.to_datetime(granules['date'])
     granules = granules.sort_values(by="date", ascending=False)
 
-    # 4 most recent observations
+    # n_obs most recent observations
     observations = granules[granules['date'] <= date].iloc[0:n_obs].apply(get_granule_filename, axis=1).tolist()
     base = "/vsis3/processed-granules/tree_cover/77/1191/tree_cover_2020_projected.tif" # matt hansen base tree map for 2020
     observations.append(base)
@@ -48,24 +48,24 @@ def main():
     
     print("Detecting forest change...")
     combined = gdal.Open(combined_file)
+    
     # use earliest observation as basemap
     # TODO: create better basemap
     base = combined.GetRasterBand(n_obs + 1).ReadAsArray()
-    # base = combined.GetRasterBand(1).ReadAsArray()
-    sum = None
+
+    change = None
     for i in range(1, n_obs + 1):
-    # for i in range(2, n_obs + 2):
         band = combined.GetRasterBand(i).ReadAsArray()
         diff = np.where(np.logical_and(band == 0, base == 1), 1, 0)
-        if sum is None:
-            sum = diff
+        if change is None:
+            change = diff
         else:
-            sum = np.add(sum, diff)
+            change = np.where(np.logical_and(change != 0, diff != 0), change + 1, change)
 
     # save results to geotiff
     loss_file = f"loss_s1_{args.date}.tif"
     shape = base.shape
-    arr_to_gtiff(sum, loss_file, combined_file, dtype=gdal.GDT_Int16, xsize=shape[1], ysize=shape[0])
+    arr_to_gtiff(change, loss_file, combined_file, dtype=gdal.GDT_Int16)
     
     # flush cashe
     combined = start_band = end_band = None
