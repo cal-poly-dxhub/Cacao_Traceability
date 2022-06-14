@@ -12,6 +12,9 @@ from arr_to_gtiff import arr_to_gtiff
 s3 = boto3.client('s3')
 
 
+# Basic version of s1 classifier.
+# Fast, but untrained and not very accurate. 
+# Thresholds set via a best guess.
 def gen_fmask(file):
     basename = os.path.basename(file)
     print(f"Generating forest mask for {file}...")
@@ -50,17 +53,16 @@ def gen_fmask(file):
 
 def main():
     bucket = "processed-granules"
-    while True: # temp while we wait for granule processing to finish
-        files = []
-        for file in s3.list_objects(Bucket=bucket, Prefix='s1')['Contents']:
-            # we have vv and vh both stored in a single folder. we want to process them at the same time
-            # this will get us the directory that contains them
-            file = os.path.dirname(f"{bucket}/{file['Key']}")
-            if file not in files:
-                files.append(file)
+    files = []
+    for file in s3.list_objects(Bucket=bucket, Prefix='s1')['Contents']:
+        # we have vv and vh both stored in a single folder. we want to process them at the same time
+        # this will get us the directory that contains them
+        file = os.path.dirname(f"{bucket}/{file['Key']}")
+        if file not in files:
+            files.append(file)
 
-        for file in files:
-            gen_fmask(file)
+    for file in files:
+        gen_fmask(file)
         
 
 
