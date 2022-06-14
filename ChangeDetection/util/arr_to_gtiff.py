@@ -1,4 +1,5 @@
 from osgeo import gdal
+import numpy as np
 
 
 """ Given a numpy array and an output name, save the array as a geotiff using
