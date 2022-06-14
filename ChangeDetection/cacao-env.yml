@@ -13,3 +13,8 @@ dependencies:
   - requests
   - rasterio
   - opencv
+  - scipy
+  - sklearn
+  - geopandas
+  - asf_search
+  - hyp3_sdk

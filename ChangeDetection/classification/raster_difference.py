@@ -7,7 +7,8 @@ import numpy as np
 from pandas.tseries.offsets import DateOffset
 from osgeo import gdal
 
-from processing_utils import arr_to_gtiff
+sys.path.insert(0, "../util/")
+from arr_to_gtiff import arr_to_gtiff
 
 
 """ Given a row in a DataFrame representing a granule, return the full filename
@@ -37,7 +38,7 @@ def create_mosaic(date_latest, date_earliest, df, name):
     # flush cache
     vrt = tif = None
 
-    # os.remove(vrt_filename)
+    os.remove(vrt_filename)
     return tif_filename
 
 
@@ -73,9 +74,10 @@ def main():
     # load database of granules
     # TODO: turn this into a proper database
     # using a csv file as a temp measure
-    granules = pd.read_csv("l8-granules-2.csv")
+    granules = pd.read_csv("s2_granules.csv")
     granules['date'] = pd.to_datetime(granules['date'])
     granules = granules.sort_values(by="date", ascending=True)
+    print(granules)
     
     start_tif = create_mosaic(start, start_d, granules, "start")
     end_tif = create_mosaic(end, end_d, granules, "end")
@@ -102,9 +104,9 @@ def main():
     combined = start_band = end_band = None
 
     # remove unnecessary files
-    # os.remove(start_tif)
-    # os.remove(end_tif)
-    # os.remove(combined_file)
+    os.remove(start_tif)
+    os.remove(end_tif)
+    os.remove(combined_file)
     print("Done.")
 
 

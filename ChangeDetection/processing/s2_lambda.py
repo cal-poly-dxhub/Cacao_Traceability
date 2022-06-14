@@ -1,14 +1,39 @@
-import urllib.parse
 import os
+import sys
 
 from osgeo import gdal
 import numpy as np
 import boto3
-import botocore
 
-from processing_utils import mask_clouds_and_calc_ndvi, arr_to_gtiff
+sys.path.insert(0, "../util/")
+from processing_utils import mask_clouds_and_calc_ndvi
+from arr_to_gtiff import arr_to_gtiff
 
 
+def lambda_handler(event, context):
+    prefix = event['Records'][0]['body']
+    prefix = prefix.split('/', 1)
+    bucket = prefix[0]
+    key = prefix[1]
+    
+    # we can only write files to the tmp directory (max. 512 mb)
+    os.chdir("/tmp")
+    
+    # vsis3 tells gdal that the file is in an s3 bucket
+    result = calc_ndvi_and_mask_s2_clouds(f"/vsis3/{bucket}/{key}")
+    print(f"Generated {result}")
+    
+    # upload generated file to s3
+    dest_bucket = "processed-granules"
+    # remove redundant folder name from uploaded file
+    prefix = os.path.dirname(os.path.dirname(key))
+    key = f"{prefix}/{result}"
+    s3 = boto3.client('s3')
+    s3.upload_file(result, dest_bucket, key)
+    print(f"Uploaded {key} to {dest_bucket}")
+    os.remove(result)
+    
+    
 """ Given a the base name of a Sentinel-2 scene, caclulate NDVI, mask clouds, and save the results as a geotiff. """
 def calc_ndvi_and_mask_s2_clouds(file):
     red_band = "B04.jp2"
@@ -34,21 +59,23 @@ def calc_ndvi_and_mask_s2_clouds(file):
     # in theory we should be able to use the vector file to mask out clouds, but
     # in practice gdal had complaints about the gml files. will reinvestigate this
     # at a later date
-    try:
-        cloud_mask_tif = gdal.Rasterize("mask.tif", cloud_mask_band_file, xRes=10, yRes=10, burnValues=1, 
+    cloud_mask_tif = gdal.Rasterize("mask.tif", cloud_mask_band_file, xRes=10, yRes=10, burnValues=1, 
                                     noData=np.nan, outputType=gdal.GDT_Byte, outputBounds=[x_min, y_min, x_max, y_max])
+    if not cloud_mask_tif:
+        cloud_mask = np.zeros_like(red)
+    else:
         cloud_mask_tif = None
         cloud_mask_ds = gdal.Open("mask.tif")
         cloud_mask = cloud_mask_ds.GetRasterBand(1).ReadAsArray()
-    except AttributeError as e:
-        print(f"Could not read cloud mask file {cloud_mask_band_file}")
-        return None
 
     ndvi_masked = mask_clouds_and_calc_ndvi(red, nir, cloud_mask)
 
     # remove temp cloud mask file to save space
     cloud_mask_ds = None
-    os.remove("mask.tif")
+    try:
+        os.remove("mask.tif")
+    except FileNotFoundError:
+        pass
     
     ndvi_masked_file = f"{os.path.basename(file)}_NDVI_MASKED.TIF"
     arr_to_gtiff(ndvi_masked, ndvi_masked_file, red_band_file)
@@ -57,46 +84,3 @@ def calc_ndvi_and_mask_s2_clouds(file):
     red_ds = nir_ds = cloud_mask_ds = out_ds = outband = driver = None
     
     return ndvi_masked_file
-
-
-def main():
-    src_bucket = "raw-granules"
-    dest_bucket = "processed-granules"
-    s3 = boto3.client('s3')
-
-    response = s3.list_objects(Bucket=src_bucket, Prefix="s2-l1c")
-    granules = []
-    for key in response['Contents']:
-            path = os.path.dirname(key['Key'])
-            granule = f"{src_bucket}/{path}/{os.path.basename(path)}"
-            try:
-                # check if file already exists
-                s3.head_object(Bucket=dest_bucket, Key=f"{path}_NDVI_MASKED.TIF")
-            except botocore.exceptions.ClientError as e:
-                if e.response['Error']['Code'] == "404":
-                    granules.append(granule)
-                else:
-                    raise e
-
-    granules = set(granules)
-    for granule in granules:
-        prefix = granule.split('/', 1)
-        bucket = prefix[0]
-        key = prefix[1]
-        # vsis3 tells gdal that the file is in an s3 bucket
-        result = calc_ndvi_and_mask_s2_clouds(f"/vsis3/{bucket}/{key}")
-        if result:
-            print(f"Generated {result}")
-        
-            # remove redundant folder name from uploaded file
-            prefix = os.path.dirname(os.path.dirname(key))
-            key = f"{prefix}/{result}"
-            s3.upload_file(result, dest_bucket, key)
-            print(f"Uploaded {key} to {dest_bucket}")
-            os.remove(result)
-    
-    print(f"Processed {len(granules)} granules.")
-
-
-if __name__ == "__main__":
-    main()

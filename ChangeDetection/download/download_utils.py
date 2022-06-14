@@ -22,6 +22,14 @@ def get_credentials(prompt="Username: "):
     return username, password
 
 
+def confirm(prompt):
+    resp = input(prompt).lower()
+    while resp not in ['yes', 'y', 'no', 'n']:
+        print("Sorry, I don't understand.")
+        resp = input(prompt).lower()
+    return resp.lower() in ['yes', 'y']
+
+
 """ Send an HTTP POST request. """
 def send_request(url, data, apiKey=None, exitIfNoResponse=True):  
     json_data = json.dumps(data)

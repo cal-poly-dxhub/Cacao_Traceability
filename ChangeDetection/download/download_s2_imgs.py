@@ -187,18 +187,17 @@ def main():
 
     if len(tile_list) == 0:
         print("No tiles matching the criteria were found.")
-        return None
+        return
     
     download = input(f"Copy {len(tile_list)} scene(s) to s3://{args.dst}? (Y/N) ")
     if download.lower() not in {'y', 'yes'}:
-        return None
+        return
 
+    # downloaded = download(downloads)
     copy_to_s3(tile_list, args.dst, files, prefix=f"s2-{args.collection.lower()}")
     
     print("Done.")
 
-    # downloaded = download(downloads)
-    # print(downloaded)
 
 if __name__ == "__main__":
     main()

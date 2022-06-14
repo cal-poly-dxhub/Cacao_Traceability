@@ -14,6 +14,8 @@ def main():
                         help="dataset to use (ex. landsat, s2-l2a, s2-l1c)")
     parser.add_argument("prefix", type=str,
                         help="geographical prefix (usually a path/frame combo, like 008/056/)")
+    parser.add_argument("-s", type=str,
+                        help="search term for included granules (ex. FMASK_nb-all)")
     parser.add_argument("-csv", type=str,
                         help="name of output csv file")
     args = parser.parse_args()
@@ -21,6 +23,7 @@ def main():
     s3 = boto3.client('s3')
     prefix = os.path.join(args.dataset, args.prefix).replace('\\', '/')
     response = s3.list_objects(Bucket=args.bucket, Prefix=prefix)
+
     
     csv = args.csv
     if not csv:
@@ -31,6 +34,8 @@ def main():
         count = 0
         for key in response['Contents']:
             granule = key['Key']
+            if args.s not in granule:
+                continue
             month = os.path.basename(os.path.dirname(granule))
             year = os.path.basename(os.path.dirname(os.path.dirname(granule)))
             

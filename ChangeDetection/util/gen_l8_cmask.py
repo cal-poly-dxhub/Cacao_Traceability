@@ -3,7 +3,8 @@ import argparse
 from osgeo import gdal
 import numpy as np
 
-from processing_utils import arr_to_gtiff
+sys.path.insert(0, "../util/")
+from arr_to_gtiff import arr_to_gtiff
 
 
 def main():

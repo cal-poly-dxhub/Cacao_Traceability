@@ -7,6 +7,7 @@ import numpy as np
 import rasterio
 import cv2 as cv
 import boto3
+from scipy.ndimage import generic_filter
 
 
 s3 = boto3.client('s3')
@@ -78,7 +79,7 @@ def enhanced_lee(img, win_size=5, num_looks=1, nodata=None):
 
 
 # Filter VV/VH bands using Enhanced Lee Filter
-def filter(file, bands, lee_win_size=5, lee_num_looks=1):
+def filter_elee(file, bands, lee_win_size=5, lee_num_looks=1):
     filtered = []
     # Process backscatter (VV/VH)
     for pq in bands:
@@ -108,6 +109,32 @@ def filter(file, bands, lee_win_size=5, lee_num_looks=1):
     
     return filtered
 
+
+# Filter INC_MAP by calculating standard deviation of neighborhood of pixels
+def filter_std(file, bands, window_size=5):
+    filtered = []
+
+    for pq in bands:
+        print(f"Processing {pq} for {file}...")
+        # Read in DN
+        basename = os.path.splitext(os.path.basename(file))[0]
+        dn_raster = f"{file}/{basename}/{basename}_{pq}.tif"
+        with rasterio.open(dn_raster) as dset:
+            dn = dset.read(1).astype(np.float64)
+            mask = dset.read_masks(1)
+            dn[mask == 0] = np.nan
+            profile = dset.profile
+
+        dn_filtered = generic_filter(dn, np.std, window_size, mode='nearest')
+
+        # Write to GeoTIFF
+        profile.update(driver='GTiff', dtype=np.float32, nodata=np.nan)
+        dn_filtered_tif = Path(f'{basename}_{pq}_filtered.tif')
+        with rasterio.open(dn_filtered_tif, 'w', **profile) as dset:
+            dset.write(dn_filtered.astype(np.float32), 1)
+
+        filtered.append(str(dn_filtered_tif))
+    return filtered
 
 # # TODO: will need to reproject images properly
 # def stack_imgs(zipfile):
@@ -142,9 +169,12 @@ def process(zipfile):
     basename = os.path.splitext(os.path.basename(zipfile))[0]
     print(f"Processing {basename}...")
 
-    # enhanced lee filter
-    bands = ['VV', 'VH']
-    processed = filter(f"/vsizip/vsis3/{zipfile}", bands)
+    # # enhanced lee filter
+    # bands = ['VV', 'VH']
+    # processed = filter_elee(f"/vsizip/vsis3/{zipfile}", bands)
+
+    bands = ['INC']
+    processed = filter_std(f"/vsizip/vsis3/{zipfile}", ['inc_map'])
 
     # upload to s3
     dest_bucket = "processed-granules"
@@ -173,10 +203,15 @@ def process(zipfile):
 
 def main():
     src_bucket = "raw-granules"
+    # files = ["sentinel_1/2020/77_1191/S1B_IW_20201219T230453_DVP_RTC30_G_gpunem_62AC.zip",
+    #          "sentinel_1/2020/77_1191/S1B_IW_20200622T230450_DVP_RTC30_G_gpunem_CF74.zip",
+    #          "sentinel_1/2021/77_1191/S1B_IW_20211214T230459_DVP_RTC30_G_gpunem_0F44.zip",
+    #          "sentinel_1/2021/77_1191/S1B_IW_20210629T230456_DVP_RTC30_G_gpunem_D958.zip"]
     for file in s3.list_objects(Bucket=src_bucket, Prefix="sentinel_1")['Contents']:
         file = f"{src_bucket}/{file['Key']}"
-        process(file)
-
+        if "77_1191" in file and "2021/" in file:
+            process(file)
+            
 
 if __name__ == '__main__':
     main()

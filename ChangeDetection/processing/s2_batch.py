@@ -1,13 +1,12 @@
-import urllib.parse
 import os
+import sys
 
-from osgeo import gdal
-import numpy as np
 import boto3
 import botocore
 
-from processing_utils import mask_clouds_and_calc_ndvi, arr_to_gtiff
-from process_l8_imgs import calc_ndvi_and_mask_l8_clouds
+sys.path.insert(0, "../util/")
+from processing_utils import mask_clouds_and_calc_ndvi
+from s2_lambda import calc_ndvi_and_mask_s2_clouds
 
 
 def main():
@@ -15,7 +14,7 @@ def main():
     dest_bucket = "processed-granules"
     s3 = boto3.client('s3')
 
-    response = s3.list_objects(Bucket=src_bucket, Prefix="landsat")
+    response = s3.list_objects(Bucket=src_bucket, Prefix="s2-l1c")
     granules = []
     for key in response['Contents']:
             path = os.path.dirname(key['Key'])
@@ -35,10 +34,12 @@ def main():
         bucket = prefix[0]
         key = prefix[1]
         # vsis3 tells gdal that the file is in an s3 bucket
-        result = calc_ndvi_and_mask_l8_clouds(f"/vsitar/vsis3/{bucket}/{key}")
+        result = calc_ndvi_and_mask_s2_clouds(f"/vsis3/{bucket}/{key}")
         if result:
             print(f"Generated {result}")
-            prefix = os.path.dirname(key)
+        
+            # remove redundant folder name from uploaded file
+            prefix = os.path.dirname(os.path.dirname(key))
             key = f"{prefix}/{result}"
             s3.upload_file(result, dest_bucket, key)
             print(f"Uploaded {key} to {dest_bucket}")
