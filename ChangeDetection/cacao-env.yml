@@ -11,3 +11,10 @@ dependencies:
   - sentinelhub
   - python=3.9
   - requests
+  - rasterio
+  - opencv
+  - scipy
+  - sklearn
+  - geopandas
+  - asf_search
+  - hyp3_sdk

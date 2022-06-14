@@ -71,8 +71,6 @@ def main():
                         help="filter scenes by acquisition date (format: yyyy-mm-dd yyyy-mm-dd)")
     parser.add_argument("-dst", metavar="bucket", type=str,
                         help="s3 bucket to store downloaded scenes in")
-#     parser.add_argument("-quiet", "--q", dest="verbose", action="store_false",
-#                         help="suppress printing to the console")
     args = parser.parse_args()
     
     start_date = parse_date(args.date_range[0])

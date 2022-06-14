@@ -7,7 +7,8 @@ import numpy as np
 from pandas.tseries.offsets import DateOffset
 from osgeo import gdal
 
-from processing_utils import arr_to_gtiff
+sys.path.insert(0, "../util/")
+from arr_to_gtiff import arr_to_gtiff
 
 
 """ Given a row in a DataFrame representing a granule, return the full filename
@@ -21,6 +22,7 @@ def get_granule_filename(granule):
 def create_mosaic(date_latest, date_earliest, df, name):
     df = df[(df['date'] > date_earliest) & 
             (df['date'] <= date_latest)]
+    
     granules = df.apply(get_granule_filename, axis=1).tolist()
 
     # build vrts
@@ -72,13 +74,14 @@ def main():
     # load database of granules
     # TODO: turn this into a proper database
     # using a csv file as a temp measure
-    granules = pd.read_csv("s2-granules.csv")
+    granules = pd.read_csv("s2_granules.csv")
     granules['date'] = pd.to_datetime(granules['date'])
-    granules = granules.sort_values(by="date", ascending=False)
+    granules = granules.sort_values(by="date", ascending=True)
+    print(granules)
     
     start_tif = create_mosaic(start, start_d, granules, "start")
     end_tif = create_mosaic(end, end_d, granules, "end")
-
+    
     # build a combined vrt with the start and end rasters. this will automatically handle differences in bounds
     print("Building combined VRT from TIF images...")
     combined_file = "combined.vrt"
@@ -94,7 +97,7 @@ def main():
     diff = np.subtract(end_band, start_band)
 
     # save results to geotiff
-    diff_file = f"diff_{args.ds}_{args.start}_{args.end}"
+    diff_file = f"diff_{args.ds}_{args.start}_{args.end}.tif"
     arr_to_gtiff(diff, diff_file, combined_file)
     
     # flush cashe
