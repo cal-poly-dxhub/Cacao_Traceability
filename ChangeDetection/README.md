@@ -22,7 +22,28 @@ In order to improve traceability and sustainability in the cacao supply chain, w
 
 ## Walkthrough and Examples
 
-Coming soon...
+1) Create cacao conda environment:
+   * `conda env create -f cacao-env.yml`
+   * `conda activate cacao`
+3) Search for Sentinel-1 granules and submit jobs for HyP3 RTC processing: 
+   * `cd download`
+   * `python download_s1_imgs.py [boundary] [start] [end]`
+4) Process Sentinel-1 granules using Enhanced Lee Filter (VV/VH bands) and standard deviation of neighborhood of pixels (INC map band): 
+   * `cd ../processing/`
+   * `python s1_batch.py`
+   * NOTE: this step should automatically be handled by the `s1_lambda.py` function deployed to AWS Lambda. However, Lambda occassionally seems to error out or skip granules when a high volume of granules are submitted for processing. If this happens, use `s1_batch.py` to process the remaining granules. This is a known issue and is being investigated.
+5) Train decision tree classifier: 
+   * `cd ../classification/`
+   * `python train_classifier.py`
+6) Classify new granules:
+   * `python classify.py`
+7) Estimate confidence of forest loss:
+   * `cd ../util/`
+   * `python make_csv.py [bucket] [dataset] [prefix] [-s search-term] [-csv csv-name]`
+   * `cd ../classification/`
+   * `python forest_change.py [date] [csv]`
+
+More documentation and examples coming soon...
 
 ## Future Improvements
 
