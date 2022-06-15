@@ -5,7 +5,7 @@ from osgeo import gdal
 import numpy as np
 import boto3
 
-sys.path.insert(0, "../util/")
+# sys.path.insert(0, "../util/") # only needed if running locally
 from processing_utils import mask_clouds_and_calc_ndvi
 from arr_to_gtiff import arr_to_gtiff
 
