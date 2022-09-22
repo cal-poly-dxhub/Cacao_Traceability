@@ -1,0 +1,6 @@
+module Pods_cacao {
+  umbrella header "Pods-cacao-umbrella.h"
+
+  export *
+  module * { export * }
+}

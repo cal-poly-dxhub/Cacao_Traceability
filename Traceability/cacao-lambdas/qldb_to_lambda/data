@@ -1,0 +1,30 @@
+# {'table_info': {
+#     'tableName': 'transactions', 
+#     'tableId': 'GJMmnfackAcEivESojHEZe'
+#     }, 
+#     'revision_data': {'
+#         employeeId': '4e2c22a5-5a45-4609-be3e-df50d9245272', 
+#         'farmerId': '275158fc-b184-4bf5-9a35-8c96c773bb38', 
+#         'source': 'aeadb5f6-b458-4c56-bbcd-e0b6c4a04zzz', 
+#         'dest': 'fc226a37-018a-4886-af64-507f95bd98a7', 
+#         'gps': {
+#             'verticalAccuracy': 3.601020880260837, 
+#             'longitude': -120.65899106685133, 
+#             'accuracy': 4.566966789096927, 
+#             'time': 1647737386000.005, 
+#             'speed': 0, 
+#             'course': -1, 
+#             'latitude': 35.25605089034453, 
+#             'altitude': 52.90020372252911
+#         }, 
+#         'source_is_empty': 1, 
+#         'time_stamp': Timestamp(1994-11-05T08:16:30.000000, OffsetTZInfo(-5:00:00), <TimestampPrecision.SECOND: 4>, fractional_precision=6), 
+#         'source_weight_kg': 1.0, 
+#         'uuid': 'c2dc99da3a2c13c6ffa07d403e19d1c5326b4b765bc9b4c4082d28ef677bbe98'
+#     }, 
+#     'revision_metadata': {
+#     'id': '4ilTN5y97pp5hJo7Yn7ZNF', 
+#     'version': 0, 
+#     'txTime': Timestamp(2022-04-07T19:02:23.984000, OffsetTZInfo(+0:00:00), <TimestampPrecision.SECOND: 4>, fractional_precision=3), 'txId': 'BqZVgHSxvI64EcXHARLAZE'
+#     }
+# }

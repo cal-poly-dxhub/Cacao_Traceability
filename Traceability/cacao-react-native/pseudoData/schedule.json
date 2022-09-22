@@ -1,0 +1,30 @@
+[
+    {
+        "idScheduleVisit": 1,
+        "farmerId": "7387c857-5071-4270-987b-868dc2556b76",
+        "visitDate": "2022-03-23T12:11:00",
+        "visitPurpose": "pickup",
+        "_comments": "farmerId are foreign keys which index into Employee table"
+    },
+    {
+        "idScheduleVisit": 2,
+        "farmerId": "275158fc-b184-4bf5-9a35-8c96c773bb38",
+        "visitDate": "2022-03-24T12:10:00",
+        "visitPurpose": "pickup",
+        "_comments": "farmerId are foreign keys which index into Employee table"
+    },
+    {
+        "idScheduleVisit": 3,
+        "farmerId": "d2066964-a2b3-4ab8-9783-f4f40bdc3b3e",
+        "visitDate": "2022-03-23T12:15:00",
+        "visitPurpose": "pickup",
+        "_comments": "farmerId are foreign keys which index into Employee table"
+    },
+    {
+        "idScheduleVisit": 4,
+        "farmerId": "d2066964-a2b3-4ab8-9783-f4f40bdc3b3e",
+        "visitDate": "2022-03-23T12:30:00",
+        "visitPurpose": "assistance",
+        "_comments": "farmerId are foreign keys which index into Employee table"
+    }
+]

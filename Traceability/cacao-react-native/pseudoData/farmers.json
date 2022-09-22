@@ -1,0 +1,23 @@
+[
+    {
+        "name": "Jaron Schreiber",
+        "phone": "18051112222",
+        "id": "7387c857-5071-4270-987b-868dc2556b76",
+        "location": [-120.659098, 35.256208],
+        "imageUrl": "https://user-images.githubusercontent.com/22374768/157307249-150e41b7-cd4f-43e1-9277-3d86adff7e5d.jpg"
+    },
+    {
+        "name": "Darren Kraker",
+        "phone": "18057659878",
+        "id": "275158fc-b184-4bf5-9a35-8c96c773bb38",
+        "location": [-100.659098, 45.256208],
+        "imageUrl": "https://user-images.githubusercontent.com/22374768/157307242-5c466cc5-0d79-43a1-82a7-a17ad7dac847.jpg"
+    },
+    {
+        "name": "Nick Osterbur",
+        "phone": "18053426678",
+        "id": "d2066964-a2b3-4ab8-9783-f4f40bdc3b3e",
+        "location": [-90.659098, 65.256208],
+        "imageUrl": "https://user-images.githubusercontent.com/22374768/157307251-9af92fc2-49fc-4660-a198-fbebe6c85b45.jpg"
+    }
+]

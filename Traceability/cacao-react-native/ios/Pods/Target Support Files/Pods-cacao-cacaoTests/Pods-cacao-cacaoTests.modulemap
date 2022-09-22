@@ -1,0 +1,6 @@
+module Pods_cacao_cacaoTests {
+  umbrella header "Pods-cacao-cacaoTests-umbrella.h"
+
+  export *
+  module * { export * }
+}
