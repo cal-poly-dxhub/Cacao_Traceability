@@ -79,7 +79,7 @@ def enhanced_lee(img, win_size=5, num_looks=1, nodata=None):
 
 
 # Filter VV/VH bands using Enhanced Lee Filter
-def filter_elee(file, bands, lee_win_size=5, lee_num_looks=1):
+def filter_elee(file, bands, lee_win_size=5, lee_num_looks=3):
     filtered = []
     # Process backscatter (VV/VH)
     for pq in bands:
@@ -101,7 +101,7 @@ def filter_elee(file, bands, lee_win_size=5, lee_num_looks=1):
 
         # Write to GeoTIFF
         profile.update(driver='GTiff', dtype=np.float32, nodata=np.nan)
-        g0_filtered_tif = Path(f'{basename}_{pq}_filtered.tif')
+        g0_filtered_tif = Path(f'{basename}_{pq}_FILTERED.tif')
         with rasterio.open(g0_filtered_tif, 'w', **profile) as dset:
             dset.write(g0_filtered.astype(np.float32), 1)
 
@@ -129,75 +129,34 @@ def filter_std(file, bands, window_size=5):
 
         # Write to GeoTIFF
         profile.update(driver='GTiff', dtype=np.float32, nodata=np.nan)
-        dn_filtered_tif = Path(f'{basename}_{pq}_filtered.tif')
+        dn_filtered_tif = Path(f'{basename}_{pq}_FILTERED.tif')
         with rasterio.open(dn_filtered_tif, 'w', **profile) as dset:
             dset.write(dn_filtered.astype(np.float32), 1)
 
         filtered.append(str(dn_filtered_tif))
     return filtered
 
-# # TODO: will need to reproject images properly
-# def stack_imgs(zipfile):
-#     basename = os.path.splitext(os.path.basename(zipfile))[0]
-#     print(f"Creating data stack for {basename}...")
-
-#     vv, vh = filter(f"/vsizip/vsis3/{zipfile}")
-#     inc = f"/vsizip/vsis3/{zipfile}/{basename}/{basename}_inc_map.tif"
-#     # go up two directories. lol
-#     year = os.path.basename(os.path.dirname(os.path.dirname(zipfile)))
-#     tree_cover = f"/vsis3/{os.path.dirname(os.path.dirname(zipfile))}/tree_cover_{year}_projected.tif" 
-
-#     files = [vv, vh, inc, tree_cover]
-
-#     vrt_filename = f"{basename}.vrt"
-#     print(f"Building {vrt_filename}...")
-#     vrt = gdal.BuildVRT(vrt_filename, files, separate=True)
-
-#     # convert vrt to tif
-#     tif_filename = f"{basename}.tif"
-#     print(f"Translating {vrt_filename} to {tif_filename}...")
-#     tif = gdal.Translate(tif_filename, vrt, format="GTiff")
-
-#     # flush cache
-#     vrt = tif = None
-
-#     os.remove(vrt_filename)
-#     return tif_filename
-
 
 def process(zipfile):
     basename = os.path.splitext(os.path.basename(zipfile))[0]
+    dirname = os.path.dirname(zipfile)
     print(f"Processing {basename}...")
 
-    # # enhanced lee filter
-    # bands = ['VV', 'VH']
-    # processed = filter_elee(f"/vsizip/vsis3/{zipfile}", bands)
+    # enhanced lee filter
+    bands = ['VV', 'VH']
+    processed = filter_elee(f"/vsizip/vsis3/{zipfile}", bands)
 
     bands = ['INC']
-    processed = filter_std(f"/vsizip/vsis3/{zipfile}", ['inc_map'])
+    processed.append(filter_std(f"/vsizip/vsis3/{zipfile}", ['inc_map']))
 
     # upload to s3
-    dest_bucket = "processed-granules"
-    s1_name_pattern = re.compile(r"""
-            (?:raw-granules/sentinel_1/)
-            (?P<year>\d{4})
-            (?:/)
-            (?P<path>\d{1,4})
-            (?:_)
-            (?P<frame>\d{1,4})
-            (?:/)
-            (?P<id>(.*)?)
-            (?:\.zip)
-            """, re.VERBOSE)
-    
-    m = s1_name_pattern.match(zipfile)
-    month = m.group('id')[11:13]
-    prefix = f"s1/{m.group('path')}/{m.group('frame')}/{m.group('year')}/{month}/{basename}/{basename}"
+    dst_bucket = "processed-granules"
     
     for file, postfix in zip(processed, bands):
-        key = f"{prefix}_{postfix}_FILTERED.tif"
-        s3.upload_file(file, dest_bucket, key)
-        print(f"Uploaded {key} to {dest_bucket}")
+        bucket, prefix = dirname.split('/', 1)
+        key = f"{prefix}/{basename}/{basename}_{postfix}_FILTERED.tif"
+        s3.upload_file(file, dst_bucket, key)
+        print(f"Uploaded {key} to {dst_bucket}")
         os.remove(file)
 
 

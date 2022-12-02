@@ -4,9 +4,8 @@ import sys
 import boto3
 import botocore
 
+# allow imports from sibling directories
 sys.path.insert(0, "../util/")
-from processing_utils import mask_clouds_and_calc_ndvi
-from arr_to_gtiff import arr_to_gtiff
 from l8_lambda import calc_ndvi_and_mask_l8_clouds
 
 
