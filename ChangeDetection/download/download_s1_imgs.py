@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 
 import asf_search as asf
 import geopandas as gpd
-import pandas as pd
 from hyp3_sdk import HyP3
 import boto3
 
@@ -68,17 +67,20 @@ def search_granules(aoi_boundary, start, end, processing_level=asf.PRODUCT_TYPE.
 
 def submit_jobs(hyp3, granules):
     for granule in granules:
-        print(f"Submitting granule {granule}...")
-
-        hyp3.submit_rtc_job(granule, granule, resolution=30.0, radiometry='gamma0',
-                            scale='power', speckle_filter=False, dem_matching=True,
-                            include_dem=False, include_inc_map=True, include_scattering_area=False)
+        id = granule['sceneName']
+        print(f"Submitting granule {id}...")
+        
+        hyp3.submit_rtc_job(id, id, resolution=30, radiometry='gamma0',
+                            scale='power', speckle_filter=False, include_dem=False,
+                            include_inc_map=True, include_scattering_area=False)
 
 
 def copy_granules(s3, hyp3, granules, dst_bucket):
+    bucket = s3.Bucket(dst_bucket)
     for granule in granules:
         job_name = granule['sceneName']
-        batch = hyp3.find_jobs(name=job_name)
+        # batch = hyp3.find_jobs(name=job_name)
+        batch = hyp3.find_jobs(name='test')
         if len(batch) == 0:
             print(f'\nJobs for {job_name} have not been submitted for RTC processing yet.')
         else:
@@ -86,26 +88,22 @@ def copy_granules(s3, hyp3, granules, dst_bucket):
                 print(f"\nThe jobs for {job_name} are not complete yet. You can see the progress below (Ctrl+C if you don't want to wait).")
                 batch = hyp3.watch(batch)
 
-            # List of tuples:
-            # item 1: dictionary with Bucket and Key
-            # item 2: datetime of expiration time
-            # item 3: URL of processed granule
-            job =  [({'Bucket': job.files[0]['s3']['bucket'], 'Key': job.files[0]['s3']['key']}, job.expiration_time, job.files[0]['url'])
-                    for job in batch.jobs]
+            # previously used to be able to copy files directly from asf's s3 bucket,
+            # but that doesn't seem to work anymore
+            # TODO: contact asf and see if this is intended
+            print(f"Downloading files for {job_name}...")
+            downloaded = batch.download_files('temp-downloads', create=True)
 
-            print(f'\nYour processed granule(s) for {job_name} are available here:')
-            for copy_source, expiration_time, _ in job:
-                print(f"\n{copy_source['Bucket']}/{copy_source['Key']}")
-                print(f'Expiration Time: {expiration_time}')
-                basename = os.path.basename(copy_source['Key'])
-                print(f"Copying {basename} to {dst_bucket}...")
-
-                year = granule['processingDate'][0:4]
-                month = granule['processingDate'][5:7]
-                path = granule['pathNumber']
-                frame = granule['frameNumber']
+            year = granule['processingDate'][0:4]
+            month = granule['processingDate'][5:7]
+            path = granule['pathNumber']
+            frame = granule['frameNumber']
+            for file in downloaded:
+                basename = os.path.basename(file)
                 dst_key = f"s1/{path}/{frame}/{year}/{month}/{basename}"
-                s3.meta.client.copy(copy_source, dst_bucket, dst_key, ExtraArgs={'RequestPayer': 'requester'})
+                print(f"Uploading {dst_key} to {dst_bucket}...")
+                bucket.upload_file(str(file), dst_key)
+                os.remove(file)
 
 
 def main():
