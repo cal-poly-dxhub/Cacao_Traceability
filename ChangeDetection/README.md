@@ -12,32 +12,39 @@ In order to improve traceability and sustainability in the cacao supply chain, w
 
 1) Define area of interest
 2) Search for new Sentinel-1 granules
-3) Download/process Sentinel-1 granules, and create 3-band data stack (VV/VH/INC):
+3) Download/process Sentinel-1 granules, and create 2-band data stack (VV/VH):
    * Perform Radiometric Terrain Calibration (RTC) processing using [ASF's HyP3 API](https://hyp3-docs.asf.alaska.edu/)
    * Reduce speckle on VV/VH bands using an Enhanced Lee Filter
-   * Calculate standard deviation of neighborhood of pixels on incidence angle map
-5) Train decision tree classifier using random sample of processed pixels, using [Matt Hansen's Global Forest Change Map](https://developers.google.com/earth-engine/datasets/catalog/UMD_hansen_global_forest_change_2021_v1_9?hl=en) as training labels
+5) Train Gaussian Naive Bayes classifier using random sample of processed pixels, using [Matt Hansen's Global Forest Change Map](https://developers.google.com/earth-engine/datasets/catalog/UMD_hansen_global_forest_change_2021_v1_9?hl=en) as training labels
 6) Classify new granules on a per-pixel basis as forest/non-forest
 7) Compare three most recent observations to known forest basemap to estimate confidence of forest loss
 
 ## Walkthrough and Examples
 
-1) Create cacao conda environment:
+1) Obtain necessary credentials:
+   * [NASA Earthdata](https://www.earthdata.nasa.gov/eosdis/science-system-description/eosdis-components/earthdata-login) (for downloading S1 granules)
+   * [Google Earth Engine](https://earthengine.google.com/signup/) (for downloading tree cover data)
+2) Create cacao conda environment and install necessary packages:
    * `conda env create -f cacao-env.yml`
    * `conda activate cacao`
+   * [Install the gcloud CLI](https://cloud.google.com/sdk/docs/install)
+   * `earthengine authenticate`
 3) Search for Sentinel-1 granules and submit jobs for HyP3 RTC processing: 
    * `cd download`
    * `python download_s1_imgs.py [boundary] [start] [end]`
-4) Process Sentinel-1 granules using Enhanced Lee Filter (VV/VH bands) and standard deviation of neighborhood of pixels (INC map band): 
+4) Process Sentinel-1 granules using Enhanced Lee Filter (VV/VH bands): 
    * `cd ../processing/`
    * `python s1_batch.py`
-   * NOTE: this step should automatically be handled by the `s1_lambda.py` function deployed to AWS Lambda. However, Lambda occassionally seems to error out or skip granules when a high volume of granules are submitted for processing. If this happens, use `s1_batch.py` to process the remaining granules. This is a known issue and is being investigated.
-5) Train decision tree classifier: 
+5) Download tree cover labels:
+   * `cd ../download/`
+   * `python download_tc.py`
+   * NOTE: GEE does not allow exports directly to s3, so the tree cover granules will have to be manually downloaded from Google Drive and uploaded to s3.
+6) Train Gaussian Naive Bayes classifier: 
    * `cd ../classification/`
    * `python train_classifier.py`
-6) Classify new granules:
+7) Classify new granules:
    * `python classify.py`
-7) Estimate confidence of forest loss:
+8) Estimate confidence of forest loss:
    * `cd ../util/`
    * `python make_csv.py [bucket] [dataset] [prefix] [-s search-term] [-csv csv-name]`
    * `cd ../classification/`
@@ -47,9 +54,9 @@ More documentation and examples coming soon...
 
 ## Future Improvements
 
-* Creating training labels manually using random sampling of data from variety of dates instead of using Hansen's dataset
-* Creating our own known forest basemap instead of using Hansen's dataset
-* Reduce variance in S1 images, either by considering neighborhood of pixels or by using temporal mean of 2/3 most recent observations
-* Improving classifier by incorporating more training data or using more complex classification method (random forest, convolutional neural network, etc)
-* Postprocessing classified images to eliminate standalone pixels
-* Incorporating [Nasa's NISAR](https://nisar.jpl.nasa.gov/) satellite once it goes online in 2024 
+* Automate downloading, preprocessing, and classification of granules using cloud infrastructure
+* Create training dataset manually instead of using Hansen's dataset
+* Improve classifier by incorporating more training data or using more complex classification method (random forest, convolutional neural network, etc.)
+* Add feedback system so ground-truth samples can help improve model
+* Incorporating [Nasa's NISAR](https://nisar.jpl.nasa.gov/) satellite once it goes online in 2024 as well as other sources of imagery (S2, L8, etc.)
+* Postprocessing classified images to reduce noise and eliminate standalone pixels
