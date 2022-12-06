@@ -1,6 +1,5 @@
 from pathlib import Path
 import os
-import re
 
 from osgeo import gdal
 import numpy as np
@@ -146,8 +145,9 @@ def process(zipfile):
     bands = ['VV', 'VH']
     processed = filter_elee(f"/vsizip/vsis3/{zipfile}", bands)
 
-    bands = ['INC']
-    processed.append(filter_std(f"/vsizip/vsis3/{zipfile}", ['inc_map']))
+    # skip INC band for now
+    # bands = ['INC']
+    # processed.append(filter_std(f"/vsizip/vsis3/{zipfile}", ['inc_map']))
 
     # upload to s3
     dst_bucket = "processed-granules"
@@ -162,14 +162,15 @@ def process(zipfile):
 
 def main():
     src_bucket = "raw-granules"
-    # files = ["sentinel_1/2020/77_1191/S1B_IW_20201219T230453_DVP_RTC30_G_gpunem_62AC.zip",
-    #          "sentinel_1/2020/77_1191/S1B_IW_20200622T230450_DVP_RTC30_G_gpunem_CF74.zip",
-    #          "sentinel_1/2021/77_1191/S1B_IW_20211214T230459_DVP_RTC30_G_gpunem_0F44.zip",
-    #          "sentinel_1/2021/77_1191/S1B_IW_20210629T230456_DVP_RTC30_G_gpunem_D958.zip"]
-    for file in s3.list_objects(Bucket=src_bucket, Prefix="sentinel_1")['Contents']:
-        file = f"{src_bucket}/{file['Key']}"
-        if "77_1191" in file and "2021/" in file:
-            process(file)
+    # avoid re-processing existing tifs for now
+    existing = s3.list_objects(Bucket='processed-granules', Prefix='s1')['Contents']
+    existing = set([os.path.dirname(file['Key']) for file in existing])
+    for file in s3.list_objects(Bucket=src_bucket, Prefix="s1")['Contents']:
+        file = file['Key']
+        if file[:-4] not in existing:
+            filepath = src_bucket + '/' + file
+            process(filepath)
+    print("Done.")
             
 
 if __name__ == '__main__':
