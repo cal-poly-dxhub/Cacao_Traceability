@@ -1,4 +1,5 @@
 import os
+import re
 
 from osgeo import gdal
 from sklearn.naive_bayes import GaussianNB
@@ -11,6 +12,9 @@ import pickle
 bucket = "processed-granules"
 s3 = boto3.client('s3')
 
+# avoid using granules we don't have labels for
+tc_labels = s3.list_objects(Bucket='processed-granules', Prefix='tree-cover')['Contents']
+tc_labels = set([os.path.basename(file['Key']) for file in tc_labels])
 
 def get_data(file, bands):
     basename = os.path.basename(file)
@@ -19,7 +23,12 @@ def get_data(file, bands):
     frame = filepath[3]
     year = filepath[4]
 
-    tree_cover = f"/vsis3/{bucket}/tree_cover/{path}/{frame}/tree_cover_{year}_projected.tif"
+    tc_basename = f"tree_cover_{path}_{frame}_{year}.tif"
+    if tc_basename not in tc_labels:
+        print(f"No tree cover labels found for {file}. Skipping...")
+        return None, None
+
+    tree_cover = f"/vsis3/{bucket}/tree-cover/{path}/{frame}/{tc_basename}"
     
     vrt_files = [tree_cover]
     for band in bands:
@@ -33,7 +42,7 @@ def get_data(file, bands):
 
     combined = gdal.Open(combined_file)
     tc = combined.GetRasterBand(1).ReadAsArray().reshape(-1)
-    # randomly sample 50% of data, with replacement
+    # randomly sample 10% of data, with replacement
     sample_pct = 0.1
     num_samples = int(tc.size * sample_pct)
     rng = np.random.default_rng()
@@ -50,50 +59,40 @@ def get_data(file, bands):
     mask = np.any(np.isnan(data_labels), axis=1)
     data_labels = data_labels[~mask]
 
-    return data_labels
+    return data_labels[:, 1:], data_labels[:, 0]
 
 
 def main():
-    files = []
-    for file in s3.list_objects(Bucket=bucket, Prefix='s1/77/1191')['Contents']:
+    files = set()
+    for file in s3.list_objects(Bucket=bucket, Prefix='s1')['Contents']:
         # we have vv and vh both stored in a single folder. we want to process them at the same time
         # this will get us the directory that contains them
-        file = os.path.dirname(f"{bucket}/{file['Key']}")
-        if file not in files:
-            files.append(file)
-    # files = ["s1/77/1191/2020/12/S1B_IW_20201219T230453_DVP_RTC30_G_gpunem_62AC",
-    #         "s1/77/1191/2020/06/S1B_IW_20200622T230450_DVP_RTC30_G_gpunem_CF74",
-    #         "s1/77/1191/2021/12/S1B_IW_20211214T230459_DVP_RTC30_G_gpunem_0F44",
-    #         "s1/77/1191/2021/06/S1B_IW_20210629T230456_DVP_RTC30_G_gpunem_D958"]
+        files.add(os.path.dirname(f"{bucket}/{file['Key']}"))
 
     # bands = ['VV', 'VH', 'INC'] # TODO: include inc
     bands = ['VV', 'VH']
     # data = []
-    train_test_split = 0.9
     all_test_data = None
     all_test_labels = None
     model = GaussianNB()
+
     for file in files:
-        # file = f"{bucket}/{file}"
         print(f"Fetching data for {file}...")
-        data = get_data(file, bands)
-        splitpoint = int(data.shape[0] * train_test_split)
-        np.random.shuffle(data)
-        train_data = data[:splitpoint, 1:]
-        train_labels = data[:splitpoint, 0].astype(np.int16)
-        test_data = data[splitpoint:, 1:]
-        test_labels = data[splitpoint:, 0].astype(np.int16)
+        data, labels = get_data(file, bands)
+        if data is None or labels is None:
+            continue
 
-        model.partial_fit(train_data, train_labels, classes=[0, 1])
-
-        if all_test_data is None:
-            all_test_data = test_data
-            all_test_labels = test_labels
+        year = file.split('/')[4]
+        if year == 2021: # use 2021 as testing data
+            if all_test_data is None:
+                all_test_data = test_data  
+                all_test_labels = test_labels
+            else:
+                all_test_data = np.concatenate((all_test_data, test_data))
+                all_test_labels = np.concatenate((all_test_labels, test_labels))
         else:
-            all_test_data = np.concatenate((all_test_data, test_data))
-            all_test_labels = np.concatenate((all_test_labels, test_labels))
-
-        # data.extend(get_data(file, bands))
+            # data.extend(get_data(file, bands))
+            model.partial_fit(data, labels, classes=[0, 1])
 
     test_data = all_test_data
     test_labels = all_test_labels
@@ -113,24 +112,9 @@ def main():
     # print(test_data)
     # print(test_labels)
 
-    # # TODO: fine tune these
-    # vv_threshold = 1.7
-    # vh_threshold = 0.15
-    # num_samples = 0
-    # num_correct = 0
-    # for features, label in zip(test_data, test_labels):
-    #     if features[0] > vv_threshold and features[1] > vh_threshold:
-    #         prediction = 1
-    #     else:
-    #         prediction = 0
-
-    #     if prediction == label:
-    #         num_correct += 1
-    #     num_samples += 1
-    
     # print(num_correct / num_samples)
     # model = tree.DecisionTreeClassifier()
-    model.fit(train_data, train_labels)
+    # model.fit(train_data, train_labels)
     print(model.score(test_data, test_labels))
     
     model_filename = "s1_classifier_nb_all_vv-vh.pkl"
