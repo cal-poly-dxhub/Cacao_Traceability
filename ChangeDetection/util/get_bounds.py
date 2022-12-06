@@ -9,8 +9,8 @@ def get_bounds(file):
     max_x = min_x + (ds.RasterXSize * xres)
     min_y  = max_y + (ds.RasterYSize * yres)
 
-    # upper left, upper right, lower right, lower left
-    return [(min_x, max_y), (max_x, max_y), (max_x, min_y), (min_x, min_y)]
+    # upper left, upper right, lower right, lower left, upper left
+    return [[[min_x, max_y], [max_x, max_y], [max_x, min_y], [min_x, min_y], [min_x, max_y]]]
 
 
 # reproject a set of coordinates to a different spatial reference

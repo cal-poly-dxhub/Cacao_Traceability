@@ -255,7 +255,7 @@ def main():
                         (?P<col_number>\d{2})   # match the collection number
                         (?:_)
                         (?P<col_category>\w{2}) # match the collection category
-                        (?:.tar)
+                        (?:\.tar)
                         """, re.VERBOSE)
         for file in completed_list:
             m = l8_name_pattern.match(file)
