@@ -60,3 +60,4 @@ More documentation and examples coming soon...
 * Add feedback system so ground-truth samples can help improve model
 * Incorporating [Nasa's NISAR](https://nisar.jpl.nasa.gov/) satellite once it goes online in 2024 as well as other sources of imagery (S2, L8, etc.)
 * Postprocessing classified images to reduce noise and eliminate standalone pixels
+* Create or find a good known forest basemap as starting point
